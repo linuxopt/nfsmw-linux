@@ -160,6 +160,12 @@ sb_test(texpack_eligible_test ARGS ${RT}/gpu/renderer.cpp)
 # The texture pack tools (texpack/), on synthetic files: the disc's archive index.
 sb_test(texpack_archive_test SOURCES ${ROOT}/texpack/archive.cpp)
 target_include_directories(texpack_archive_test PRIVATE ${ROOT})
+# ... EA's JDLZ decompression and the city stream's compressed blocks.
+sb_test(texpack_jdlz_test SOURCES ${ROOT}/texpack/jdlz.cpp)
+target_include_directories(texpack_jdlz_test PRIVATE ${ROOT})
+# ... the 360 TPK layout (docs/TEXPACK_FORMAT.md).
+sb_test(texpack_tpk_test SOURCES ${ROOT}/texpack/tpk.cpp)
+target_include_directories(texpack_tpk_test PRIVATE ${ROOT})
 # Shadow Resolution's Auto: 2x while the scene renders at 2x or more (gpu/shadow_auto.h), as the renderer applies it (GitHub #90).
 sb_test(shadow_auto_test SOURCES ${RT}/video/picture_fit.cpp ${RT}/video/scale_budget.cpp ARGS ${RT}/gpu/renderer.cpp ${RT}/user/settings.cpp)
 if(SB_GLSLANG_VALIDATOR)

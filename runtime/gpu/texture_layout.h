@@ -9,6 +9,8 @@
 // against Vulkan's), for tests/texture_layout_test.cpp and texpack/.
 #pragma once
 #include <cstdint>
+#include <cstring>
+#include <vector>
 
 namespace gpu::texlayout
 {
@@ -94,5 +96,33 @@ namespace gpu::texlayout
             b.size = b.rowBytes * (bh + offY);
         }
         return b;
+    }
+
+    // The base level's own blocks, row by row (bw x bh blocks of
+    // 1 << bpbLog2 bytes), from `src` (its first byte, as BaseLevel
+    // measures). The tiled layout's padding (rows and columns up to the
+    // 32-block alignment) and linear rows' tails are left out: the game
+    // reuses that memory for other data, so only the blocks identify a
+    // texture (the texture pack's key hashes these). No packed-mip offset
+    // (texpack::Eligible excludes those).
+    inline void GatherBase(const FormatInfo& fi, uint32_t width, uint32_t height, uint32_t pitchBlocks, bool tiled,
+        const uint8_t* src, std::vector<uint8_t>& out)
+    {
+        const uint32_t bw = (width + fi.block - 1) / fi.block, bh = (height + fi.block - 1) / fi.block;
+        const size_t bpb = size_t(1) << fi.bpbLog2;
+        const Base b = BaseLevel(fi, width, height, pitchBlocks, tiled, 0, 0);
+        out.resize(size_t(bw) * bh * bpb);
+        uint8_t* dst = out.data();
+        for (uint32_t y = 0; y < bh; y++)
+        {
+            if (!tiled)
+            {
+                memcpy(dst, src + size_t(y) * b.rowBytes, bw * bpb);
+                dst += bw * bpb;
+                continue;
+            }
+            for (uint32_t x = 0; x < bw; x++, dst += bpb)
+                memcpy(dst, src + Tiled2D(x, y, b.pitchAligned, fi.bpbLog2), bpb);
+        }
     }
 }

@@ -4435,10 +4435,13 @@ void main()
         // Texture pack keys (gpu/texpack_key.h) of what the renderer loads:
         // NFSMW_TEXPACK_LOG=1 prints each eligible (re)load's key;
         // NFSMW_TEXPACK_DUMP=<dir> writes <dir>/<key>.txt once per key (its
-        // format, size and address), to check the extractor's keys against.
+        // format, size and address), to check the extractor's keys against. The key
+        // hashes the base level's own blocks (texlayout::GatherBase), not its
+        // tiled padding, which the game reuses for other data.
         const bool s_texpackLog = [] { const char* v = std::getenv("NFSMW_TEXPACK_LOG"); return v && v[0] == '1'; }();
         const std::string s_texpackDump = [] { const char* v = std::getenv("NFSMW_TEXPACK_DUMP"); return std::string(v ? v : ""); }();
         std::unordered_set<uint64_t> s_texpackDumped;
+        std::vector<uint8_t> s_texpackBlocks;  // a texture's own blocks (texlayout::GatherBase), reused
         void TexpackNote(uint64_t key, uint32_t format, uint32_t width, uint32_t height, uint32_t base, uint32_t size, bool hit)
         {
             const std::string name = texpack::KeyName(key);
@@ -5138,7 +5141,11 @@ void main()
                         in.width = width;
                         in.height = height;
                         if (texpack::Eligible(in))
-                            TexpackNote(texpack::Key(s_sharedHost + base, size, format, width, height), format, width, height, base, size, false);
+                        {
+                            texlayout::GatherBase(layoutFormat, width, height, pitchBlocks, f.tiled != 0, s_sharedHost + base, s_texpackBlocks);
+                            TexpackNote(texpack::Key(s_texpackBlocks.data(), s_texpackBlocks.size(), format, width, height), format, width, height,
+                                base, size, false);
+                        }
                     }
                     EnsureShadow(base, size);
                     if (mipSize)
