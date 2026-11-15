@@ -1,3 +1,193 @@
+# nfsmw-linux
+
+**SpeedBreaker for Linux as one AppImage, with a desktop launcher and an AI HD texture pack.**
+
+This is an unofficial fork of [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker)
+v0.2.5, the static recompilation of the Xbox 360 version of *Need for Speed: Most Wanted*
+(2005). It is not made by, or affiliated with, the SpeedBreaker project, Electronic Arts or
+Valve. The original README follows [further down](#the-original-speedbreaker-readme); everything
+in it still applies, and this section describes only what this fork adds.
+
+> [!IMPORTANT]
+> **No game files are included.** As with SpeedBreaker, you need your own legally obtained disc
+> image of your own Xbox 360 copy of the game; the first run's installer checks it and installs
+> it. The AppImage and this repository hold no game code or data, and the HD texture pack is
+> built on your machine from your own install. Please don't share game files, disc images or
+> texture packs made from them.
+
+<p align="center">
+  <img src="assets/screenshots/nfsmw-linux-launcher.png" alt="The nfsmw-linux launcher window: dark, with tabs for Display, Graphics, Audio, Input, Wheel, Controls, Game, Advanced and Saves; the Graphics tab is open, showing Anti-Aliasing, Upscaling set to FSR 1, Sharpening, Anisotropic Filtering, Mipmaps, Internal Resolution, Shadow options, Sharper UI, Movie Upscaling and HD Textures, with a blue Play button" width="760">
+  <br>
+  <sub>The launcher: every in-game setting before the game starts.</sub>
+</p>
+
+**Contents:** [Download and run](#download-and-run) · [What's new](#whats-new-in-this-fork) ·
+[The launcher](#the-launcher) · [HD textures](#ai-hd-texture-pack) ·
+[Where your files are](#where-your-files-are) · [Building it yourself](#building-it-yourself) ·
+[Known limitations](#known-limitations) · [Credits](#credits-for-this-fork)
+
+## Download and run
+
+1. Download `SpeedBreaker-0.2.5-x86_64.AppImage` from this repository's
+   [Releases](../../releases) page. Its `.sha256` file is there too:
+   `sha256sum -c SpeedBreaker-0.2.5-x86_64.AppImage.sha256`
+2. Make it executable and run it:
+   ```bash
+   chmod +x SpeedBreaker-0.2.5-x86_64.AppImage
+   ./SpeedBreaker-0.2.5-x86_64.AppImage
+   ```
+3. The launcher opens. Change whatever you like, then press **Play**. On the first run the game's
+   installer asks for your disc image (see [Quick start](#quick-start) below).
+
+**Needs:** an x86-64 Linux PC with an x86-64-v3 CPU (Intel Haswell / AMD Zen or later) and a
+Vulkan GPU driver; FUSE for AppImages (most desktops have it; otherwise run it with
+`--appimage-extract-and-run`). Python 3 only for building the HD texture pack.
+
+**Older distributions:** the game and its tools carry their own C and C++ runtimes and use them
+when the system's are older, so the same file runs across current and older distros, and on a
+Steam Deck in Desktop Mode.
+
+| Command | What it does |
+|---|---|
+| `./SpeedBreaker-…AppImage` | The launcher, then the game when you press Play |
+| `… --play` | Straight into the game, no launcher (for Steam shortcuts) |
+| `… --launcher` | The launcher, even when it's set not to open |
+| `… --texpack build` | Build the AI HD texture pack on this machine |
+| `… --texpack status` | Show the installed pack and capture |
+| `… --texpack capture` | Play with texture capture on (see below) |
+| `… --texpack remove` | Delete the pack |
+| `… <disc image or other option>` | The game, as SpeedBreaker always did |
+
+## What's new in this fork
+
+- **A native Linux AppImage**: one file with the game, its launcher and its tools. No install;
+  data goes to `~/.local/share/speedbreaker`, as with the SteamOS bundle.
+- **A desktop launcher** (Qt 6, dark theme): every in-game setting, keyboard controls and save
+  management before the game starts.
+- **An AI HD texture pack**: the game's own textures upscaled 4x by an AI model and compressed for
+  the GPU, keeping the original art, just sharper. It's built on your machine from your install,
+  tuned to its hardware, and loads in-game with no frame-rate cost on the test machine.
+- **HD Textures setting** (Settings > Graphics): Auto, 1K, 2K or Off, shown once a pack is
+  installed. Auto picks by GPU memory and switches the pack off where it would hurt.
+
+## The launcher
+
+- **Settings tabs** are the game's own: Display, Graphics (FSR 1 upscaling, internal resolution,
+  shadows, HD Textures...), Audio, Input, Wheel, Game and Advanced, with the same choices and help
+  text as the in-game menu. It reads and writes the game's `settings.toml`, and **writes only what
+  you change**, so options you never touched keep following the game's defaults.
+- **Controls**: the keyboard as an Xbox 360 controller. Click a key, then press the new one (Esc
+  keeps the old one); right-click to clear. The help line names other controls sharing a key.
+- **Saves**: your save profiles (for each disc release you have), with **Back Up**, **Restore**,
+  **Export** and **Import** (one `.sbsave` file, to move a career to another PC) and **Delete**.
+  Anything that replaces or deletes a save backs it up first, to
+  `~/.local/share/speedbreaker/save-backups/`, and the files are flushed to disk before the old
+  save goes. Imported files are checked strictly and can only ever write a save profile.
+- **Open this launcher at start**: untick it to go straight to the game next time;
+  `--launcher` brings the window back.
+- **It never gets in the way of playing**: in SteamOS Game Mode, or with no display, the game starts
+  without it, and if the launcher can't run on a machine (a missing library, a crash), the game
+  starts anyway.
+- **Dark**, whatever your desktop's theme. The mouse wheel scrolls the page and never changes a
+  setting it passes over.
+
+## AI HD texture pack
+
+```bash
+./SpeedBreaker-0.2.5-x86_64.AppImage --texpack build
+```
+
+What it does, on your machine only:
+
+1. **Extracts** the textures from your installed game (reading the game's archives, including
+   its JDLZ-compressed city stream).
+2. **Upscales** each one 4x with [Real-ESRGAN-ncnn-vulkan](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan)
+   on your GPU, using the **4xLSDIRCompactC3** model by Philip Hofmann (CC-BY-4.0), picked by a
+   side-by-side comparison on the game's own textures as the one closest to the original art. The
+   model is downloaded on first use and checked against its SHA-256; it isn't bundled.
+3. **Keeps the original look**: only the fine detail comes from the AI; the colours and alpha come
+   from the original, normal maps are recognised and handled as such, and nothing is enlarged past
+   2048 pixels.
+4. **Compresses** to BC7 with a full mip chain, into `~/.local/share/speedbreaker/texture-pack`.
+
+**Hardware auto-detection:** the builder picks its GPU, tile size and number of parallel jobs from
+the machine (`NFSMW_GPU=<index or name>` picks a GPU), warns on integrated-only graphics, checks the
+free disk space first, and resumes where it left off. In the game, **HD Textures: Auto** uses 2K
+textures on a GPU with 8 GB or more, 1K on smaller ones, and turns the pack off on integrated GPUs
+at high internal resolutions; replacements stream in the background within a memory budget.
+
+**Coverage and capture:** about 61% of the textures can be read straight from the disc files;
+the rest are in parts of the city stream that are compressed in a format the extractor doesn't
+read. For those, play once with `--texpack capture` (it records the textures the game actually
+shows, up to 2 GB) and run `--texpack build` again.
+
+On the test machine (RX 9070 XT) the full pack is about 2,150 textures, 2 GB, built in about
+4 minutes; free roam with it ran at a locked 60 fps, the same as without it.
+
+**Another PC:** build there, or copy the `texture-pack` folder over (it's your own data from your
+own disc; keep it to yourself).
+
+## Where your files are
+
+| What | Where |
+|---|---|
+| Settings | `~/.local/share/speedbreaker/settings.toml` |
+| Saves | `~/.local/share/speedbreaker/save/` (European discs: `save-pal-es/`, `save-pal-de/`) |
+| Save backups | `~/.local/share/speedbreaker/save-backups/` |
+| HD texture pack | `~/.local/share/speedbreaker/texture-pack/` |
+| Installed game | `~/.local/share/speedbreaker/game/` (unless you chose another folder) |
+| Logs | `~/.local/share/speedbreaker/last-run.log` |
+
+## Building it yourself
+
+On an Arch-family system (other distros: the same packages under their names), from a checkout
+of this repository with your own `ppc/` recompilation output as the original README describes
+under [For developers](#for-developers):
+
+```bash
+# Qt 6 for the launcher, squashfs-tools for the AppImage
+sudo pacman -S --needed clang cmake ninja qt6-base qt6-wayland squashfs-tools
+cmake -B build/main -G Ninja -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+  -DSB_TEXPACK=ON -DSB_LAUNCHER=ON -DSB_TESTS=ON
+scripts/texpack/setup_tools.sh          # Real-ESRGAN-ncnn-vulkan and bc7enc, pinned
+cmake --build build/main
+ctest --test-dir build/main             # 119 tests
+SB_UNTAGGED=1 scripts/steamos/make_bundle.sh build/main build/bundle
+scripts/linux/make_appimage.sh <AppImage type-2 runtime>   # build/appimage/
+```
+
+The runtime is `runtime-x86_64` from [AppImage/type2-runtime](https://github.com/AppImage/type2-runtime)
+(or the first part of any type-2 AppImage). The design documents are in
+[docs/superpowers/specs](docs/superpowers/specs) and the texture formats in
+[docs/TEXPACK_FORMAT.md](docs/TEXPACK_FORMAT.md).
+
+## Known limitations
+
+- The in-game **Check for Updates** looks at the original SpeedBreaker releases, not this fork's.
+- The launcher needs the system's systemd and OpenGL libraries; without them it doesn't appear
+  (the game still starts).
+- After deleting a save, getting it back means **Import** from the hidden `save-backups` folder.
+- Key labels in the launcher name the US-layout position ("W"), as `settings.toml` stores them.
+- About 39% of the city's textures reach the pack only through `--texpack capture`.
+- Wheel calibration stays in the in-game menu (it needs the live wheel).
+
+## Credits for this fork
+
+Built on [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker) by project(u) and
+its contributors (GPL-3.0-or-later). The fork adds code under the same licence and uses
+[Qt 6](https://www.qt.io/) (LGPL-3.0, dynamically linked, its licences shipped in the AppImage),
+[Real-ESRGAN-ncnn-vulkan](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) and ncnn
+(BSD-3-Clause), [bc7enc](https://github.com/richgel999/bc7enc_rdo) (MIT/public domain),
+[stb](https://github.com/nothings/stb) (MIT/public domain), [xxHash](https://github.com/Cyan4973/xxHash)
+(BSD-2-Clause), and the 4xLSDIRCompactC3 model by Philip Hofmann (CC-BY-4.0, downloaded, not
+bundled). The source's own licences are in [LICENSES](LICENSES); the AppImage carries the licence of
+everything it bundles in its `licenses/` folder.
+
+---
+
+## The original SpeedBreaker README
+
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/speedbreaker-banner-dark.png">
