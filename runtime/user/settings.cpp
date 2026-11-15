@@ -572,6 +572,11 @@ namespace settings
               .table = "game", .key = "language", .label = "Language",
               .description = "The language of the game's menus and race text: English (the USA disc's), or French, German, Italian, Spanish, Dutch, Swedish, Danish, Polish or Finnish, from the same disc's files. The movies and the speech stay in English, as the disc has them. The European (PAL) Spanish disc has Spanish movies and speech, and starts in Spanish; another language there keeps them in Spanish.",
               .env = "NFSMW_LANGUAGE", .defaultValue = double(game::language::kEnglish), .entries = kLanguageEntries },
+            // The desktop launcher (hidden: it has its own window for it)
+            { .id = Id::LauncherShowAtStart, .category = Category::Advanced, .type = Type::Bool, .apply = Apply::Live, .hidden = true,
+              .table = "launcher", .key = "show_at_start", .label = "Open the Launcher at Start",
+              .description = "Show the SpeedBreaker launcher before the game starts (the Linux AppImage).",
+              .env = "NFSMW_LAUNCHER", .defaultValue = 1 },
         };
         static_assert(std::size(kOptions) == kCount, "one row per settings::Id");
 
@@ -1159,7 +1164,8 @@ namespace settings
             return "";
         }
 
-        std::string Serialize(const std::array<double, kCount>& values)
+        // `write`: which options go in (nullptr: all of them, a full save).
+        std::string Serialize(const std::array<double, kCount>& values, const std::array<bool, kCount>* write = nullptr)
         {
             std::string out =
                 "# SpeedBreaker settings, written by the game's settings menu. Hand edits\n"
@@ -1170,6 +1176,8 @@ namespace settings
             for (size_t i = 0; i < kCount; i++)
             {
                 const Option& o = kOptions[i];
+                if (write && !(*write)[i])
+                    continue;
                 if (std::string_view(o.table) != table)
                 {
                     table = o.table;
@@ -1764,6 +1772,60 @@ namespace settings
             path = LoadedPath();
         }
         return Save(path.empty() ? DefaultPath() : path);
+    }
+
+    bool SaveTouched()
+    {
+        std::lock_guard saveLock(s_saveMutex);
+        std::filesystem::path path;
+        std::array<double, kCount> values;
+        std::array<bool, kCount> write{};
+        {
+            std::lock_guard lock(s_mutex);
+            EnsureInitLocked("settings were saved");
+            if (s_fileFound && !s_fileLoaded)
+            {
+                fprintf(stderr, "[settings] not saved: settings.toml didn't load\n");
+                LastErrorText() = "Couldn't save the settings: settings.toml didn't load (it was kept as settings.toml.bad).";
+                return false;
+            }
+            bool changed = false;
+            for (size_t i = 0; i < kCount; i++)
+            {
+                values[i] = s_stored[i].load(std::memory_order_relaxed);
+                bool dirty = values[i] != s_baseline[i];
+                changed |= dirty;
+                write[i] = s_inFile[i] || dirty;
+            }
+            if (!changed)
+                return true;
+            path = LoadedPath().empty() ? DefaultPath() : LoadedPath();
+        }
+        std::string error = WriteAtomically(path, Serialize(values, &write));
+        {
+            std::lock_guard lock(s_mutex);
+            if (!error.empty())
+                LastErrorText() = std::format("Couldn't save the settings: {}.", error);
+            else
+            {
+                LastErrorText().clear();
+                for (size_t i = 0; i < kCount; i++)
+                    if (write[i])
+                    {
+                        s_baseline[i] = values[i];
+                        s_inFile[i] = true;
+                    }
+                if (LoadedPath().empty())
+                    LoadedPath() = path;
+            }
+        }
+        if (!error.empty())
+        {
+            fprintf(stderr, "[settings] %s\n", error.c_str());
+            return false;
+        }
+        fprintf(stderr, "[settings] saved the changed settings to %s\n", path.string().c_str());
+        return true;
     }
 
     bool Save(const std::filesystem::path& path)

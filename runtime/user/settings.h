@@ -150,6 +150,9 @@ namespace settings
         UpdateCheck,  // Check for Updates at Startup (update/updater.h); the menu shows it after Check for Updates
         // Game (the [game] table)
         GameLanguage,  // game/language.cpp: the game's language, game::language's ids (English = 0)
+        // The desktop launcher (launcher/, the [launcher] table; hidden: the
+        // game doesn't use it, but its saves keep it)
+        LauncherShowAtStart,  // open the launcher before the game (Linux AppImage)
         Count
     };
     constexpr size_t kCount = size_t(Id::Count);
@@ -353,6 +356,14 @@ namespace settings
     // frame.
     bool Save();
     bool Save(const std::filesystem::path& path);
+    // The desktop launcher's save (launcher/): like Save(), to the path last
+    // loaded or DefaultPath(), but only the options the file already holds
+    // plus those whose stored value changed since the last Load or save, so
+    // one the player never set keeps following its default (the game's
+    // Save() writes every option). Nothing changed: no write, true. A file
+    // that exists but didn't load is left alone (false), as RecordVersion
+    // leaves it.
+    bool SaveTouched();
 
     // Why the last Load() or Save() failed, for the menu to show the player:
     // "" after one that succeeded (a missing file is a success). Values

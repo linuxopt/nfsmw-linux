@@ -352,6 +352,13 @@ else()
         ARGS ${CMAKE_CURRENT_BINARY_DIR}/settings_out)
 endif()
 target_include_directories(settings_test SYSTEM PRIVATE ${ROOT}/tools/XenonRecomp/thirdparty/tomlplusplus/include)
+# The desktop launcher's save (settings::SaveTouched): only the file's options
+# and the changed ones, so defaults stay defaults.
+if(NOT WIN32)
+    sb_test(settings_touched_test SOURCES ${RT}/user/settings.cpp ${RT}/platform/posix/file_io.cpp
+        ARGS ${CMAKE_CURRENT_BINARY_DIR}/settings_touched_out)
+    target_include_directories(settings_touched_test SYSTEM PRIVATE ${ROOT}/tools/XenonRecomp/thirdparty/tomlplusplus/include)
+endif()
 # "Choose a folder..." in the installer (install/placement.h): where the game
 # goes in a picked folder and what is refused, on planted facts and in a
 # scratch folder with a sandbox HOME (the installer's file calls through the
