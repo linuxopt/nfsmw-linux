@@ -68,6 +68,28 @@ namespace texpack
         Find(file, 0, file.size(), 0, out);
     }
 
+    void ScanTpks(std::span<const uint8_t> f, std::vector<TpkSpan>& out)
+    {
+        for (size_t at = 0; at + 16 <= f.size(); at += 4)
+        {
+            if (Le32(&f[at]) != kTpk)
+                continue;
+            const size_t end = at + 8 + size_t(Le32(&f[at + 4]));
+            if (end > f.size())
+                continue;
+            bool info = false, data = false;
+            Chunks(f, at + 8, end, [&](uint32_t id, size_t, size_t) {
+                info = info || id == kInfo;
+                data = data || id == kData;
+            });
+            if (info && data)
+            {
+                out.push_back({ at, end });
+                at = end - 4;  // (TPKs don't nest)
+            }
+        }
+    }
+
     bool ParseTpk(std::span<const uint8_t> f, const TpkSpan& tpk, std::vector<TexRecord>& out, std::string& error)
     {
         size_t records = 0, recordsSize = 0, fetch = 0, fetchSize = 0, header = 0, pixels = 0;

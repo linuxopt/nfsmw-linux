@@ -108,6 +108,28 @@ int main()
     texpack::FindTpks(junk, tpks);
     CHECK(tpks.empty(), "junk");
 
+    // ScanTpks: a TPK behind a chunk the walk can't get past (its header lost
+    // in an undecoded block, here 0xFF bytes) is found by its signature; a
+    // stray 0xB3300000 inside pixel data isn't a TPK.
+    {
+        std::vector<uint8_t> lost(0x40, 0xFF);
+        std::vector<uint8_t> g = BuildFile();
+        const size_t shift = lost.size() + 0x1000 - (lost.size() % 0x1000);  // keep the 4 KB data alignment: pad to 0x1000
+        std::vector<uint8_t> h(shift, 0xFF);
+        h.insert(h.end(), g.begin(), g.end());
+        // A stray signature with a size that fits but holds no records.
+        h[0x80] = 0x00; h[0x81] = 0x00; h[0x82] = 0x30; h[0x83] = 0xB3;
+        h[0x84] = 0x10; h[0x85] = 0x00; h[0x86] = 0x00; h[0x87] = 0x00;
+        std::vector<texpack::TpkSpan> walked, scanned;
+        texpack::FindTpks(h, walked);
+        CHECK(walked.empty(), "the walk stops at the lost header");
+        texpack::ScanTpks(h, scanned);
+        CHECK(scanned.size() == 1 && scanned[0].start == shift + 0x18, "the scan finds the real TPK only");
+        std::vector<texpack::TexRecord> r2;
+        CHECK(scanned.size() == 1 && texpack::ParseTpk(h, scanned[0], r2, error) && r2.size() == 2 && r2[0].dataOffset == shift + 0x1000,
+            "and parses it in place");
+    }
+
     if (s_failures)
         fprintf(stderr, "%d failure(s)\n", s_failures);
     else

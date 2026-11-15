@@ -37,6 +37,12 @@ namespace texpack
     // Stops at the first chunk that runs past its parent's end.
     void FindTpks(std::span<const uint8_t> file, std::vector<TpkSpan>& out);
 
+    // Every TPK in `file` found by its signature: a 0xB3300000 header, at a
+    // 4-byte boundary, whose chunk fits the file and holds texture records
+    // (0xB3310000) and pixels (0xB3320000). For decoded stream sections
+    // with holes, where a lost chunk header stops FindTpks' walk.
+    void ScanTpks(std::span<const uint8_t> file, std::vector<TpkSpan>& out);
+
     bool ParseTpk(std::span<const uint8_t> file, const TpkSpan& tpk, std::vector<TexRecord>& out, std::string& error);
 
     // The record's base level lies inside a file of `fileSize` bytes.

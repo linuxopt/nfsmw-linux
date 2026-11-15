@@ -33,7 +33,7 @@ namespace
     void KeyTextures(std::span<const uint8_t> file, const std::vector<bool>& known, Counts& c, std::unordered_set<uint64_t>& seen)
     {
         std::vector<texpack::TpkSpan> tpks;
-        texpack::FindTpks(file, tpks);
+        texpack::ScanTpks(file, tpks);
         std::vector<texpack::TexRecord> recs;
         std::vector<uint8_t> blocks;
         std::string error;
