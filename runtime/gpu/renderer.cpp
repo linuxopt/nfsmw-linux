@@ -27,6 +27,7 @@
 #include "texture_layout.h"
 #include "texpack_eligible.h"
 #include "texpack_key.h"
+#include "texpack_capture.h"
 #include "xenos/registers.h"
 
 #include <kernel/vmem.h>
@@ -4442,6 +4443,18 @@ void main()
         const std::string s_texpackDump = [] { const char* v = std::getenv("NFSMW_TEXPACK_DUMP"); return std::string(v ? v : ""); }();
         std::unordered_set<uint64_t> s_texpackDumped;
         std::vector<uint8_t> s_texpackBlocks;  // a texture's own blocks (texlayout::GatherBase), reused
+        // Play-capture (gpu/texpack_capture.h): NFSMW_TEXPACK_CAPTURE=1 saves each
+        // eligible texture once to <data>/texture-capture/ for the pack build,
+        // up to 2 GB; the textures the disc extraction can't read come from here.
+        const bool s_texpackCaptureOn = [] { const char* v = std::getenv("NFSMW_TEXPACK_CAPTURE"); return v && v[0] == '1'; }();
+        std::unique_ptr<texpack::Capture> s_texpackCapture;  // made at the first texture load (the data folder is known by then)
+        void StartTexpackCapture()
+        {
+            const std::filesystem::path dir = GetUserPath() / "texture-capture";
+            s_texpackCapture = std::make_unique<texpack::Capture>(dir, uint64_t(2) << 30);
+            fprintf(stderr, "[texpack] capture on: %zu textures (%llu MB) in %s already\n", s_texpackCapture->Count(),
+                (unsigned long long)(s_texpackCapture->Bytes() >> 20), dir.c_str());
+        }
         void TexpackNote(uint64_t key, uint32_t format, uint32_t width, uint32_t height, uint32_t base, uint32_t size, bool hit)
         {
             const std::string name = texpack::KeyName(key);
@@ -5126,7 +5139,9 @@ void main()
                         return TextureView(t, f.swizzle);
                     }
                     s_hitch.textureBytes += size + mipSize;
-                    if (s_texpackLog || !s_texpackDump.empty())
+                    if (s_texpackCaptureOn && !s_texpackCapture)
+                        StartTexpackCapture();
+                    if (s_texpackLog || !s_texpackDump.empty() || s_texpackCapture)
                     {
                         texpack::EligibleIn in;
                         in.cube = cube;
@@ -5143,8 +5158,10 @@ void main()
                         if (texpack::Eligible(in))
                         {
                             texlayout::GatherBase(layoutFormat, width, height, pitchBlocks, f.tiled != 0, s_sharedHost + base, s_texpackBlocks);
-                            TexpackNote(texpack::Key(s_texpackBlocks.data(), s_texpackBlocks.size(), format, width, height), format, width, height,
-                                base, size, false);
+                            const uint64_t key = texpack::Key(s_texpackBlocks.data(), s_texpackBlocks.size(), format, width, height);
+                            TexpackNote(key, format, width, height, base, size, false);
+                            if (s_texpackCapture && s_texpackCapture->Want(key, s_texpackBlocks.size()))
+                                s_texpackCapture->Submit(key, { format, uint32_t(f.endianness), width, height }, s_texpackBlocks);
                         }
                     }
                     EnsureShadow(base, size);
