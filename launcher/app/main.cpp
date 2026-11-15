@@ -7,6 +7,7 @@
 // With "Open this launcher at start" off it exits with kExitPlay at once,
 // before any window, unless --launcher asks for the window.
 #include "launcher_window.h"
+#include "theme.h"
 
 #include <QApplication>
 #include <QMessageBox>
@@ -33,7 +34,7 @@ int main(int argc, char** argv)
         return launcher::kExitPlay;
 
     QApplication app(argc, argv);
-    QApplication::setStyle("Fusion");
+    launcher::ApplyDarkTheme(app);
     QApplication::setApplicationName("SpeedBreaker");
     QGuiApplication::setDesktopFileName("speedbreaker");
 

@@ -4,6 +4,7 @@
 // version, for a settings.toml the launcher creates).
 // Argument: a scratch folder (its data folder is set through XDG_DATA_HOME).
 #include <launcher_window.h>
+#include <theme.h>
 
 #include <QApplication>
 #include <QCheckBox>
@@ -100,6 +101,25 @@ int main(int argc, char** argv)
     unsetenv("NFSMW_AA");
     QApplication app(argc, argv);
     const fs::path user = GetUserPath();
+
+    // Dark, whatever the desktop's theme (offscreen has none: Qt's light default).
+    CHECK(app.palette().color(QPalette::Window).lightness() > 128, "the test starts from Qt's light default");
+    launcher::ApplyDarkTheme(app);
+    {
+        const QPalette p = app.palette();
+        CHECK(p.color(QPalette::Window).lightness() < 60, "a dark window");
+        CHECK(p.color(QPalette::Base).lightness() < 60, "dark fields");
+        CHECK(p.color(QPalette::Button).lightness() < 70, "dark buttons");
+        CHECK(p.color(QPalette::WindowText).lightness() > 200 && p.color(QPalette::Text).lightness() > 200 &&
+                  p.color(QPalette::ButtonText).lightness() > 200,
+            "light text");
+        CHECK(p.color(QPalette::Disabled, QPalette::ButtonText).lightness() < p.color(QPalette::ButtonText).lightness(),
+            "disabled text dimmer");
+        CHECK(p.color(QPalette::Mid).lightness() > 110, "the env note's colour stays readable");
+        settings::Load();
+        LauncherWindow w(user);
+        CHECK(w.palette().color(QPalette::Window) == p.color(QPalette::Window), "the window takes it");
+    }
     const fs::path toml = user / "settings.toml";
 
     settings::Load();

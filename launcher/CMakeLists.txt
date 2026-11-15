@@ -21,6 +21,7 @@ if(SB_LAUNCHER)
         app/option_row.cpp
         app/controls_tab.cpp
         app/saves_tab.cpp
+        app/theme.cpp
         ${RT}/user/settings.cpp
         ${RT}/user/paths.cpp
         ${RT}/platform/posix/file_io.cpp

@@ -42,7 +42,6 @@ LauncherWindow::LauncherWindow(std::filesystem::path userDir, QWidget* parent) :
         auto* banner = new QLabel("SpeedBreaker is running: close it first, or its own settings will replace these when it exits.", this);
         banner->setObjectName("running_banner");
         banner->setWordWrap(true);
-        banner->setStyleSheet("QLabel { background: #fff3cd; color: #664d03; padding: 8px; border-radius: 4px; }");
         layout->addWidget(banner);
     }
 
