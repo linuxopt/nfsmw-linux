@@ -171,6 +171,10 @@ target_include_directories(texpack_tpk_test PRIVATE ${ROOT})
 # ... decoding gathered blocks to RGBA8 as the untile shader reads them, and the upscaler's classes.
 sb_test(texpack_decode_test SOURCES ${ROOT}/texpack/decode.cpp)
 target_include_directories(texpack_decode_test PRIVATE ${ROOT})
+# ... full extraction: disc and captured textures into PNGs and a manifest.
+sb_test(texpack_extract_test SOURCES ${ROOT}/texpack/extract.cpp ${ROOT}/texpack/archive.cpp ${ROOT}/texpack/jdlz.cpp
+    ${ROOT}/texpack/tpk.cpp ${ROOT}/texpack/decode.cpp)
+target_include_directories(texpack_extract_test PRIVATE ${ROOT})
 # Shadow Resolution's Auto: 2x while the scene renders at 2x or more (gpu/shadow_auto.h), as the renderer applies it (GitHub #90).
 sb_test(shadow_auto_test SOURCES ${RT}/video/picture_fit.cpp ${RT}/video/scale_budget.cpp ARGS ${RT}/gpu/renderer.cpp ${RT}/user/settings.cpp)
 if(SB_GLSLANG_VALIDATOR)
