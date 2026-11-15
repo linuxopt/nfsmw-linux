@@ -13,6 +13,8 @@
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
+#include <QSlider>
+#include <QWheelEvent>
 #include <QTabWidget>
 
 #include "launcher_fixture.h"
@@ -256,6 +258,36 @@ int main(int argc, char** argv)
             CHECK(Count(user / "save-backups") == 2, "after a backup (%zu)", Count(user / "save-backups"));
             CHECK(list->count() == 0, "the list follows");
             CHECK(!w.findChild<QLabel*>("saves_empty")->isHidden(), "and says there are none");
+        }
+    }
+
+    // The mouse wheel over a list or a slider that wasn't clicked scrolls the
+    // page and changes nothing (a page scrolled past it would otherwise
+    // change settings under the pointer, saved on Play).
+    {
+        settings::Load();
+        LauncherWindow w(user);
+        w.show();
+        w.tabs()->setCurrentIndex(1);  // Graphics, where both are
+        QApplication::processEvents();
+        QComboBox* scaling = w.findChild<QComboBox*>("video.scaling");
+        QSlider* sharpening = w.findChild<QSlider*>("video.sharpening");
+        CHECK(scaling && sharpening, "the Upscaling list and the Sharpening slider");
+        if (scaling && sharpening)
+        {
+            const int index = scaling->currentIndex(), value = sharpening->value();
+            for (QWidget* target : { static_cast<QWidget*>(scaling), static_cast<QWidget*>(sharpening) })
+                for (int dy : { -120, 120 })
+                {
+                    QWheelEvent e(QPointF(5, 5), QPointF(5, 5), QPoint(), QPoint(0, dy), Qt::NoButton, Qt::NoModifier, Qt::NoScrollPhase, false);
+                    QApplication::sendEvent(target, &e);
+                    CHECK(scaling->currentIndex() == index && sharpening->value() == value, "one wheel step (%d) moved nothing", dy);
+                }
+            CHECK(scaling->currentIndex() == index, "the list didn't move");
+            CHECK(sharpening->value() == value, "the slider didn't move");
+            CHECK(!settings::Dirty(), "nothing to save");
+            CHECK(scaling->focusPolicy() == Qt::StrongFocus && sharpening->focusPolicy() == Qt::StrongFocus,
+                "the wheel doesn't take focus either");
         }
     }
 

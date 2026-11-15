@@ -6,6 +6,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSlider>
+#include <QWheelEvent>
 
 #include <cmath>
 
@@ -13,6 +14,39 @@ namespace launcher
 {
     namespace
     {
+        // A list or slider takes the mouse wheel only once it has been
+        // clicked (focused): over one that wasn't, the wheel scrolls the page,
+        // so scrolling past a row never changes the setting under the pointer.
+        class QuietList : public QComboBox
+        {
+        public:
+            using QComboBox::QComboBox;
+
+        protected:
+            void wheelEvent(QWheelEvent* e) override
+            {
+                if (hasFocus())
+                    QComboBox::wheelEvent(e);
+                else
+                    e->ignore();
+            }
+        };
+
+        class QuietSlider : public QSlider
+        {
+        public:
+            using QSlider::QSlider;
+
+        protected:
+            void wheelEvent(QWheelEvent* e) override
+            {
+                if (hasFocus())
+                    QSlider::wheelEvent(e);
+                else
+                    e->ignore();
+            }
+        };
+
         QString Name(const settings::Option& o)
         {
             return QString::fromUtf8(o.table) + "." + QString::fromUtf8(o.key);
@@ -29,8 +63,9 @@ namespace launcher
 
         QWidget* EnumEditor(const settings::Option& o, QWidget* parent)
         {
-            auto* list = new QComboBox(parent);
+            auto* list = new QuietList(parent);
             list->setObjectName(Name(o));
+            list->setFocusPolicy(Qt::StrongFocus);
             const double stored = settings::GetStoredValue(o.id);
             int current = -1;
             for (const settings::EnumEntry& e : o.entries)
@@ -52,8 +87,9 @@ namespace launcher
             auto* box = new QWidget(parent);
             auto* layout = new QHBoxLayout(box);
             layout->setContentsMargins(0, 0, 0, 0);
-            auto* slider = new QSlider(Qt::Horizontal, box);
+            auto* slider = new QuietSlider(Qt::Horizontal, box);
             slider->setObjectName(Name(o));
+            slider->setFocusPolicy(Qt::StrongFocus);
             auto* value = new QLabel(box);
             value->setMinimumWidth(80);
             const int steps = int(std::lround((o.max - o.min) / o.step));
