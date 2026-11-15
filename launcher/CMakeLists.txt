@@ -19,6 +19,8 @@ if(SB_LAUNCHER)
     qt_add_library(sb_launcher_app STATIC
         app/launcher_window.cpp
         app/option_row.cpp
+        app/controls_tab.cpp
+        app/saves_tab.cpp
         ${RT}/user/settings.cpp
         ${RT}/user/paths.cpp
         ${RT}/platform/posix/file_io.cpp

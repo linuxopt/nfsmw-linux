@@ -10,6 +10,7 @@
 #include <QWidget>
 
 #include <filesystem>
+#include <functional>
 
 #include <user/settings.h>
 
@@ -36,6 +37,12 @@ public:
     const std::filesystem::path& userDir() const { return m_userDir; }
     // The help line: `text`, or the default hint for "".
     void describe(const QString& text);
+    // A yes/cancel question and a warning, through the hooks when set (the
+    // tests answer them; no dialog opens).
+    bool confirm(const QString& question);
+    void message(const QString& text);
+    std::function<bool(const QString&)> confirmHook;
+    std::function<void(const QString&)> messageHook;
 
 signals:
     void playRequested();

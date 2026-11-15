@@ -1,7 +1,9 @@
 // SpeedBreaker desktop launcher. GPL-3.0-or-later (see COPYING). See launcher_window.h.
 #include "launcher_window.h"
 
+#include "controls_tab.h"
 #include "option_row.h"
+#include "saves_tab.h"
 
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -48,10 +50,13 @@ LauncherWindow::LauncherWindow(std::filesystem::path userDir, QWidget* parent) :
     for (size_t c = 0; c < size_t(settings::Category::Count); c++)
     {
         const auto category = settings::Category(c);
-        if (QWidget* page = categoryPage(category))
+        QWidget* page = category == settings::Category::Controls ? new ControlsTab(this) : categoryPage(category);
+        if (page)
             m_tabs->addTab(page, QString::fromUtf8(settings::CategoryName(category)));
     }
+    m_tabs->addTab(new SavesTab(this), "Saves");
     layout->addWidget(m_tabs, 1);
+    connect(m_tabs, &QTabWidget::currentChanged, this, [this] { describe({}); });
 
     m_help = new QLabel(this);
     m_help->setObjectName("help");
@@ -153,7 +158,24 @@ QWidget* LauncherWindow::categoryPage(settings::Category category)
 
 void LauncherWindow::describe(const QString& text)
 {
-    m_help->setText(text.isEmpty() ? QString(kHint) : text);
+    if (m_help)
+        m_help->setText(text.isEmpty() ? QString(kHint) : text);
+}
+
+bool LauncherWindow::confirm(const QString& question)
+{
+    if (confirmHook)
+        return confirmHook(question);
+    return QMessageBox::question(this, "SpeedBreaker", question, QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) ==
+           QMessageBox::Yes;
+}
+
+void LauncherWindow::message(const QString& text)
+{
+    if (messageHook)
+        messageHook(text);
+    else
+        QMessageBox::warning(this, "SpeedBreaker", text);
 }
 
 bool LauncherWindow::eventFilter(QObject* watched, QEvent* event)
@@ -183,7 +205,7 @@ void LauncherWindow::play()
 {
     if (!saveIfChanged())
     {
-        QMessageBox::warning(this, "SpeedBreaker", QString::fromStdString(settings::LastError()));
+        message(QString::fromStdString(settings::LastError()));
         return;
     }
     emit playRequested();
@@ -193,7 +215,7 @@ void LauncherWindow::closeEvent(QCloseEvent* event)
 {
     if (!saveIfChanged())
     {
-        QMessageBox::warning(this, "SpeedBreaker", QString::fromStdString(settings::LastError()));
+        message(QString::fromStdString(settings::LastError()));
         event->ignore();
         return;
     }

@@ -8,8 +8,13 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QKeyEvent>
 #include <QLabel>
+#include <QListWidget>
+#include <QPushButton>
 #include <QTabWidget>
+
+#include "launcher_fixture.h"
 
 #include <cstdio>
 #include <cstdlib>
@@ -48,6 +53,20 @@ namespace
             if (l->text() == QString::fromUtf8(text))
                 return true;
         return false;
+    }
+
+    size_t Count(const fs::path& dir)
+    {
+        size_t n = 0;
+        std::error_code ec;
+        for (fs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec))
+            n++;
+        return n;
+    }
+
+    void fixture_profile(const fs::path& user)
+    {
+        fixture::Profile(user, "save", "TJ", "career");
     }
 
     int OptionLines(const std::string& text)
@@ -91,8 +110,14 @@ int main(int argc, char** argv)
             "the game's categories in order: %s", tabs.join(",").toUtf8().constData());
         CHECK(tabs.contains("Advanced"), "Advanced");
         for (const settings::Option& o : settings::Options())
-            if (o.hidden && o.type != settings::Type::Key)
+        {
+            // (A hidden wheel button and a Controls row can share a label.)
+            bool alsoShown = false;
+            for (const settings::Option& other : settings::Options())
+                alsoShown |= !other.hidden && std::string(other.label) == o.label;
+            if (o.hidden && !alsoShown)
                 CHECK(!HasLabel(w, o.label), "hidden option %s isn't shown", o.label);
+        }
         CHECK(!HasLabel(w, "HD Textures"), "no pack: no HD Textures row");
         CHECK(HasLabel(w, "Upscaling"), "the Upscaling row (FSR)");
         CHECK(!w.findChild<QCheckBox*>("launcher_show_at_start")->text().isEmpty() &&
@@ -145,6 +170,71 @@ int main(int argc, char** argv)
         settings::Load();
         LauncherWindow w(user);
         CHECK(HasLabel(w, "HD Textures"), "a pack: the HD Textures row");
+    }
+
+    // The Controls tab: 24 controls, two keys each, at the Controls
+    // category's place; a key press binds by its position.
+    {
+        settings::Load();
+        LauncherWindow w(user);
+        w.messageHook = [](const QString& m) { printf("  (message: %s)\n", m.toUtf8().constData()); };
+        QStringList tabs = Tabs(w);
+        CHECK(tabs.indexOf("Controls") == tabs.indexOf("Wheel") + 1 || (tabs.indexOf("Wheel") < 0 && tabs.indexOf("Controls") == 4),
+            "Controls in the game's order: %s", tabs.join(",").toUtf8().constData());
+        CHECK(tabs.last() == "Saves", "Saves last");
+        int keyButtons = 0;
+        for (QPushButton* b : w.findChildren<QPushButton*>())
+            keyButtons += b->objectName().startsWith("keys.");
+        CHECK(keyButtons == 48, "24 controls x 2 keys (%d)", keyButtons);
+
+        QPushButton* rt = w.findChild<QPushButton*>("keys.right_trigger");
+        CHECK(rt != nullptr, "Right Trigger's first key");
+        if (rt)
+        {
+            auto press = [&](int qtKey, quint32 native, Qt::KeyboardModifiers mods = Qt::NoModifier) {
+                QKeyEvent e(QEvent::KeyPress, qtKey, mods, native, 0, 0, QString());
+                QApplication::sendEvent(rt, &e);
+            };
+            settings::Set(settings::Id::KeyRightTrigger, 4);  // a
+            rt->click();
+            press(Qt::Key_Escape, 9);
+            CHECK(settings::GetStoredValue(settings::Id::KeyRightTrigger) == 4, "Esc: no new key");
+            rt->click();
+            press(Qt::Key_Super_L, 133);
+            CHECK(settings::GetStoredValue(settings::Id::KeyRightTrigger) == 4, "Super can't be bound");
+            CHECK(w.findChild<QLabel*>("help")->text().contains("can't be used"), "and the help line says so");
+            press(Qt::Key_W, 25);
+            CHECK(settings::GetStoredValue(settings::Id::KeyRightTrigger) == 26, "the wait went on: W bound (26)");
+            CHECK(rt->text() == "W", "the button shows it: %s", rt->text().toUtf8().constData());
+            press(Qt::Key_D, 40);
+            CHECK(settings::GetStoredValue(settings::Id::KeyRightTrigger) == 26, "no wait: a key press does nothing");
+            rt->click();
+            press(Qt::Key_Shift, 50);
+            CHECK(settings::GetStoredValue(settings::Id::KeyRightTrigger) == 225, "Left Shift (225)");
+            CHECK(rt->text() == "Left Shift", "named: %s", rt->text().toUtf8().constData());
+        }
+    }
+
+    // The Saves tab: back up, then delete (backed up first).
+    {
+        fixture_profile(user);
+        settings::Load();
+        LauncherWindow w(user);
+        w.confirmHook = [](const QString&) { return true; };
+        w.messageHook = [](const QString& m) { printf("  (message: %s)\n", m.toUtf8().constData()); };
+        QListWidget* list = w.findChild<QListWidget*>("saves_list");
+        CHECK(list && list->count() == 1 && list->item(0)->text().contains("TJ"), "TJ listed");
+        if (list && list->count() == 1)
+        {
+            list->setCurrentRow(0);
+            w.findChild<QPushButton*>("backup")->click();
+            CHECK(Count(user / "save-backups") == 1, "one backup (%zu)", Count(user / "save-backups"));
+            w.findChild<QPushButton*>("delete")->click();
+            CHECK(!fs::exists(user / "save" / "TJ") && !fs::exists(user / "save" / "TJ.xcontent"), "deleted");
+            CHECK(Count(user / "save-backups") == 2, "after a backup (%zu)", Count(user / "save-backups"));
+            CHECK(list->count() == 0, "the list follows");
+            CHECK(!w.findChild<QLabel*>("saves_empty")->isHidden(), "and says there are none");
+        }
     }
 
     if (g_failures)
