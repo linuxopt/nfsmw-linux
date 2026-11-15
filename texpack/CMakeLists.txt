@@ -5,6 +5,7 @@ add_library(texpack_core STATIC
     archive.cpp
     jdlz.cpp
     tpk.cpp
+    decode.cpp
 )
 target_include_directories(texpack_core PUBLIC ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/runtime)
 target_compile_features(texpack_core PUBLIC cxx_std_20)
