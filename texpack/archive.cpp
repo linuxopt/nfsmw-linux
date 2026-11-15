@@ -30,7 +30,7 @@ namespace texpack
             return false;
         }
         for (size_t at = 0; at < zdir.size(); at += 24)
-            m_entries.push_back({ Le32(&zdir[at]), Le32(&zdir[at + 4]), Le32(&zdir[at + 8]), Le32(&zdir[at + 12]) });
+            m_entries.push_back({ Le32(&zdir[at]), Le32(&zdir[at + 4]), Le32(&zdir[at + 8]), Le32(&zdir[at + 16]) });
         return true;
     }
 

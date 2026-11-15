@@ -1,7 +1,8 @@
 // SpeedBreaker tests. GPL-3.0-or-later (see COPYING).
 //
 // The disc's file archive as texpack/archive.h reads it: NFS/ZDIR.BIN's
-// 24-byte little-endian entries {name hash, archive, sector, size, ...},
+// 24-byte little-endian entries {name hash, archive, sector, another
+// sector count (not used), size, checksum},
 // each file at ZZDATA<archive>.BIN offset sector * 0x800. Synthetic files
 // in a temporary folder: no game data.
 //
@@ -39,9 +40,9 @@ static void Entry(std::vector<uint8_t>& zdir, uint32_t hash, uint32_t archive, u
     Put32(zdir, hash);
     Put32(zdir, archive);
     Put32(zdir, sector);
+    Put32(zdir, 0x7777);  // not the size: the disc's index has another number here
     Put32(zdir, size);
-    Put32(zdir, 0);
-    Put32(zdir, 0);
+    Put32(zdir, 0xC0FFEE);
 }
 
 static void Write(const fs::path& p, const std::vector<uint8_t>& v)
