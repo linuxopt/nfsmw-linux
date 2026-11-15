@@ -3,7 +3,9 @@
 // profile there is backed up first, and kept whole when anything fails),
 // delete through Remove (backed up first). Argument: a scratch folder.
 #include <backups.h>
+#include <durable.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <ctime>
 #include <unistd.h>
@@ -114,6 +116,45 @@ int main(int argc, char** argv)
     fs::path kept = backups::Dir(user) / "TJ2-20261115-120000.sbsave";
     CHECK(fs::exists(kept), "kept as a backup");
     CHECK(backups::Replace(user, kept, now, error) && fixture::ReadBytes(user / "save" / "TJ2" / "TJ2") == "other", "and restored");
+
+    // Flushed to disk before anything is removed: a power cut right after a
+    // delete or a replace must never lose the save and its backup together.
+    {
+        fs::path dur = scratch / "durable";
+        fixture::Profile(dur, "save", "TJ", "career-1");
+        const saves::Profile p{ "save", "TJ", "TJ", {} };
+        std::vector<std::string> synced;
+        bool profileThereAtBackupSync = false, oldThereAtFolderSync = false;
+        durable::SetObserver([&](const fs::path& path) {
+            synced.push_back(path.string());
+            if (path.extension() == ".sbsave")
+                profileThereAtBackupSync = fs::exists(dur / "save" / "TJ");
+        });
+        CHECK(backups::Remove(dur, p, At(2026, 11, 16, 8, 0, 0), error), "deleted: %s", error.c_str());
+        fs::path kept = backups::Dir(dur) / "TJ-20261116-080000.sbsave";
+        auto has = [&](const fs::path& want) { return std::find(synced.begin(), synced.end(), want.string()) != synced.end(); };
+        CHECK(has(kept) && has(backups::Dir(dur)), "the backup and its folder were flushed");
+        CHECK(profileThereAtBackupSync, "before the profile was deleted");
+
+        synced.clear();
+        durable::SetObserver([&](const fs::path& path) {
+            synced.push_back(path.string());
+            if (path == dur / "save")
+                oldThereAtFolderSync = oldThereAtFolderSync || !fs::exists(dur / "save" / "TJ" / "TJ") ||
+                                        fixture::ReadBytes(dur / "save" / "TJ" / "TJ") == "career-1";
+        });
+        fixture::Profile(dur, "save", "TJ", "career-2");  // a new TJ, replaced by the backup
+        CHECK(backups::Replace(dur, kept, At(2026, 11, 16, 9, 0, 0), error), "restored: %s", error.c_str());
+        CHECK(has(dur / "save" / "TJ" / "TJ") || std::any_of(synced.begin(), synced.end(), [](const std::string& s) {
+                  return s.find(".import-") != std::string::npos && s.ends_with("/TJ/TJ"); }),
+            "the restored file was flushed");
+        CHECK(has(dur / "save"), "and the save folder after the renames");
+        size_t extracted = 0;
+        for (const std::string& s : synced)
+            extracted += s.ends_with(".xcontent");
+        CHECK(extracted >= 1, "its header too");
+        durable::SetObserver(nullptr);
+    }
 
     if (g_failures)
         printf("launcher_backups_test: %d failure(s)\n", g_failures);

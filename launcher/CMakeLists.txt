@@ -7,6 +7,7 @@ add_library(sb_launcher_core STATIC
     core/saves.cpp
     core/sbsave.cpp
     core/backups.cpp
+    core/durable.cpp
 )
 target_include_directories(sb_launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core ${CMAKE_SOURCE_DIR}/runtime)
 target_compile_features(sb_launcher_core PUBLIC cxx_std_20)

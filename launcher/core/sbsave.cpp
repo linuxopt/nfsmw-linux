@@ -13,6 +13,8 @@
 
 #include <unistd.h>
 
+#include "durable.h"
+
 namespace launcher::sbsave
 {
     namespace fs = std::filesystem;
@@ -340,6 +342,12 @@ namespace launcher::sbsave
             error = "Can't write " + out.string() + ": " + ec.message();
             return false;
         }
+        // On disk before the caller deletes or replaces anything on its strength.
+        if (!durable::SyncFile(out) || !durable::SyncDir(out.parent_path().empty() ? fs::path(".") : out.parent_path()))
+        {
+            error = "Can't make sure " + out.filename().string() + " reached the disk";
+            return false;
+        }
         return true;
     }
 
@@ -399,6 +407,12 @@ namespace launcher::sbsave
                 return false;
             }
             SetTime(to, e.mtime);
+            if (!durable::SyncFile(to))
+            {
+                error = "Can't make sure " + to.filename().string() + " reached the disk";
+                cleanup();
+                return false;
+            }
         }
         SetTime(staging / info.name, dirTime);
         fs::rename(staging / info.name, dir, ec);
@@ -418,6 +432,9 @@ namespace launcher::sbsave
             return false;
         }
         cleanup();
+        // The new entries on disk before the caller drops the profile they replace.
+        durable::SyncDir(dir);
+        durable::SyncDir(folder);
         return true;
     }
 }
