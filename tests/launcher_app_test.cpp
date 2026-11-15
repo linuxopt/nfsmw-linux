@@ -26,6 +26,8 @@
 
 #include <user/paths.h>
 #include <user/settings.h>
+#include <game/language.h>
+#include <install/manifest.h>
 
 static int g_failures = 0;
 #define CHECK(cond, ...) do { if (!(cond)) { g_failures++; printf("  FAIL %s:%d: %s: ", __FILE__, __LINE__, #cond); printf(__VA_ARGS__); printf("\n"); } } while (0)
@@ -254,6 +256,38 @@ int main(int argc, char** argv)
             CHECK(Count(user / "save-backups") == 2, "after a backup (%zu)", Count(user / "save-backups"));
             CHECK(list->count() == 0, "the list follows");
             CHECK(!w.findChild<QLabel*>("saves_empty")->isHidden(), "and says there are none");
+        }
+    }
+
+    // A PAL disc's language is the Language row's default, as in the game:
+    // shown as such, and English (the table's default) saved when chosen.
+    {
+        const install::Manifest* palEs = nullptr;
+        for (const install::Manifest* m : install::GameManifests())
+            if (m->region == "pal-es")
+                palEs = m;
+        CHECK(palEs != nullptr, "the PAL ES manifest");
+        if (palEs)
+        {
+            fs::create_directories(user / "game");
+            std::ofstream(user / "game" / "default.xex").close();
+            fs::resize_file(user / "game" / "default.xex", palEs->Xex().size);
+            std::ofstream(toml, std::ios::trunc) << "[video]\nanti_aliasing = false\n";
+            launcher::ApplyReleaseDefaults(user);
+            settings::Load();
+            LauncherWindow w(user);
+            QComboBox* language = w.findChild<QComboBox*>("game.language");
+            CHECK(language != nullptr, "the Language list");
+            const int32_t spanish = game::language::DiscLanguage("pal-es");
+            if (language)
+            {
+                CHECK(language->currentData().toInt() == spanish, "shows the disc's language (%d), not English",
+                    language->currentData().toInt());
+                language->setCurrentIndex(language->findData(int(game::language::kEnglish)));
+                CHECK(w.saveIfChanged(), "saved");
+                std::string text = Read(toml);
+                CHECK(text.find("language = \"english\"") != std::string::npos, "English is written:\n%s", text.c_str());
+            }
         }
     }
 

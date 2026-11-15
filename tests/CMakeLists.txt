@@ -365,6 +365,8 @@ if(TARGET sb_launcher_core)
     target_link_libraries(launcher_sbsave_test PRIVATE sb_launcher_core)
     sb_test(launcher_backups_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_backups_out)
     target_link_libraries(launcher_backups_test PRIVATE sb_launcher_core)
+    sb_test(launcher_release_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_release_out)
+    target_link_libraries(launcher_release_test PRIVATE sb_launcher_core)
     # The AppImage's AppRun: the launcher first, the game on Play or whenever
     # the launcher can't run (a stub launcher, a stub game).
     add_executable(launcher_stub launcher_stub.cpp)

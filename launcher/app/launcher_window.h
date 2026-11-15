@@ -23,6 +23,12 @@ namespace launcher
     // speedbreaker-launcher's exit codes, which AppRun acts on.
     inline constexpr int kExitClosed = 0;  // the window was closed: nothing to start
     inline constexpr int kExitPlay = 10;   // Play: AppRun starts the game
+
+    // Before settings::Load, as the game does (runtime/main.cpp
+    // SetReleaseDefaults): an installed PAL disc's language is the Language
+    // row's default (launcher/core/release.h), so the launcher shows and
+    // saves it as the game would.
+    void ApplyReleaseDefaults(const std::filesystem::path& userDir);
 }
 
 class LauncherWindow : public QWidget

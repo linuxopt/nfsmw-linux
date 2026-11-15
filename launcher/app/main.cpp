@@ -29,6 +29,7 @@ int main(int argc, char** argv)
     // folder must not get a second, new one from the launcher.
     if (std::string moved = MigrateUserFolders(); !moved.empty())
         fputs(moved.c_str(), stderr);
+    launcher::ApplyReleaseDefaults(GetUserPath());
     const bool loaded = settings::Load();
     if (loaded && !forced && !settings::GetBool(settings::Id::LauncherShowAtStart))
         return launcher::kExitPlay;

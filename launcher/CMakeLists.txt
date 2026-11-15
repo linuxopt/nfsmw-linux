@@ -8,9 +8,19 @@ add_library(sb_launcher_core STATIC
     core/sbsave.cpp
     core/backups.cpp
     core/durable.cpp
+    core/release.cpp
+    ${CMAKE_SOURCE_DIR}/runtime/install/manifest.cpp
 )
 target_include_directories(sb_launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core ${CMAKE_SOURCE_DIR}/runtime)
 target_compile_features(sb_launcher_core PUBLIC cxx_std_20)
+# The releases the game itself knows (install/manifest.cpp): PAL DE only in a
+# build that links the German code (recomp/CMakeLists.txt).
+if(SB_HAVE_PAL_ES)
+    target_compile_definitions(sb_launcher_core PRIVATE SB_PAL_ES=1)
+endif()
+if(SB_HAVE_PAL_DE)
+    target_compile_definitions(sb_launcher_core PRIVATE SB_PAL_DE=1)
+endif()
 
 # The Qt window (SB_LAUNCHER, top-level CMakeLists.txt): compiled with the
 # game's own settings code (runtime/user/settings.cpp and what it needs), so

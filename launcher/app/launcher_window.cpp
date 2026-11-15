@@ -22,7 +22,20 @@
 
 #include <vector>
 
+#include <cstdlib>
+#include <format>
+
+#include <release.h>
 #include <rules.h>
+
+void launcher::ApplyReleaseDefaults(const std::filesystem::path& userDir)
+{
+    const char* gameDir = std::getenv("NFSMW_GAME_DIR");
+    const int32_t language = release::DiscLanguageDefault(userDir, gameDir);
+    if (language >= 0)
+        settings::SetDeviceDefault(settings::Id::GameLanguage, language,
+            std::format("the language of the {} disc", release::InstalledRegion(userDir, gameDir)));
+}
 
 namespace
 {
