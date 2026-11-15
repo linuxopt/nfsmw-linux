@@ -1,0 +1,235 @@
+#!/usr/bin/env python3
+# SpeedBreaker texture pack tools. GPL-3.0-or-later (see COPYING).
+#
+# speedbreaker-texpack: build the AI-upscaled HD texture pack from your own
+# installed game (and what play-capture saved), tuned to this machine.
+#
+#   speedbreaker-texpack build [--yes] [--force] [--no-ui] [--model ID] [--game DIR]
+#   speedbreaker-texpack status
+#   speedbreaker-texpack remove [--yes]
+#
+# build: extracts every texture (texpack-extract), upscales the colour and UI
+# ones 4x with the chosen model (realesrgan-ncnn-vulkan, on the GPU
+# hwdetect.py picks), and encodes each to BC7 with mips (texpack-encode) into
+# ~/.local/share/speedbreaker/texture-pack/<key>.dds, plus pack.json. It runs
+# in chunks and can be interrupted: a re-run carries on (--force redoes all).
+# The pack never leaves this computer unless you copy it: it is made from the
+# game's art. Copy the texture-pack folder to another machine's data folder
+# to use it there; one pack serves every machine (the game loads lower mips
+# where memory is short).
+import argparse
+import datetime
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import time
+import urllib.request
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, HERE)
+import hwdetect  # noqa: E402
+
+DATA = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"), "speedbreaker")
+CACHE = os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "speedbreaker")
+PACK = os.path.join(DATA, "texture-pack")
+CAPTURE = os.path.join(DATA, "texture-capture")
+WORK = os.path.join(CACHE, "texpack-work")
+MODELS = os.path.join(CACHE, "models")
+CHUNK = 200
+
+
+def say(*a):
+    print("[texpack]", *a, flush=True)
+
+
+def find_tool(name):
+    """A bundled tool: SB_TEXPACK_BIN, beside this script (the AppImage's lib/texpack), or a source checkout's build."""
+    dirs = [os.environ.get("SB_TEXPACK_BIN", ""), HERE, os.path.join(HERE, "..", "lib", "texpack"),
+            os.path.join(HERE, "..", "build", "main", "texpack"),
+            os.path.join(HERE, "..", "tools", "texpack", "src", "Real-ESRGAN-ncnn-vulkan", "build")]
+    for d in dirs:
+        p = os.path.join(d, name)
+        if d and os.path.isfile(p) and os.access(p, os.X_OK):
+            return os.path.realpath(p)
+    sys.exit(f"speedbreaker-texpack: can't find {name} (set SB_TEXPACK_BIN)")
+
+
+def run(cmd, **kw):
+    return subprocess.run(cmd, check=False, text=True, **kw)
+
+
+def game_dir(arg):
+    d = arg or os.path.join(DATA, "game")
+    if not os.path.isfile(os.path.join(d, "NFS", "ZDIR.BIN")):
+        sys.exit(f"speedbreaker-texpack: no installed game in {d} (install it in SpeedBreaker first, or pass --game)")
+    return d
+
+
+def region(game):
+    sha = ""
+    try:
+        for line in open(os.path.join(game, ".nfsmw-install")):
+            if line.startswith("xex_sha256"):
+                sha = line.split("=", 1)[1].strip().strip('"')
+    except OSError:
+        pass
+    return hwdetect.region_of(sha) or "usa"
+
+
+def machine():
+    gpus = hwdetect.parse_gpuinfo(run([find_tool("texpack-gpuinfo")], capture_output=True).stdout)
+    mem = 0
+    for line in open("/proc/meminfo"):
+        if line.startswith("MemAvailable:"):
+            mem = int(line.split()[1]) // 1024
+    os.makedirs(DATA, exist_ok=True)
+    os.makedirs(CACHE, exist_ok=True)
+    disk = min(shutil.disk_usage(DATA).free, shutil.disk_usage(CACHE).free) // (1 << 20)
+    return hwdetect.Machine(gpus=gpus, threads=os.cpu_count() or 1, free_ram_mb=mem, free_disk_mb=disk)
+
+
+def model(models_json, wanted):
+    spec = json.load(open(models_json))
+    chosen = next((m for m in spec["models"] if (m["id"] == wanted if wanted else m.get("default"))), None)
+    if not chosen:
+        sys.exit(f"speedbreaker-texpack: no model {wanted} in models.json")
+    os.makedirs(MODELS, exist_ok=True)
+    for f in chosen["files"]:
+        path = os.path.join(MODELS, f["name"])
+        ok = os.path.exists(path) and hashlib.sha256(open(path, "rb").read()).hexdigest() == f["sha256"]
+        if not ok:
+            say(f"downloading model file {f['name']} ({chosen['license']}, by {chosen['author']})")
+            data = urllib.request.urlopen(spec["source"] + f["name"], timeout=120).read()
+            if hashlib.sha256(data).hexdigest() != f["sha256"]:
+                sys.exit(f"speedbreaker-texpack: {f['name']} doesn't match its SHA-256: not used")
+            with open(path + ".partial", "wb") as out:
+                out.write(data)
+            os.replace(path + ".partial", path)
+    return chosen
+
+
+def build(args):
+    game = game_dir(args.game)
+    reg = region(game)
+    say(f"game: {game} ({reg})")
+    say("extracting the disc's textures and play-captured ones...")
+    os.makedirs(WORK, exist_ok=True)
+    r = run([find_tool("texpack-extract"), os.path.join(game, "NFS"), WORK, "--capture", CAPTURE, "--region", reg],
+            stderr=subprocess.PIPE)
+    if r.returncode != 0:
+        sys.exit(r.stderr)
+    say(r.stderr.strip().replace("texpack-extract: ", ""))
+    manifest = json.load(open(os.path.join(WORK, "manifest.json")))
+    wanted = [t for t in manifest["textures"] if t["class"] == "color" or (t["class"] == "ui" and not args.no_ui)]
+    os.makedirs(PACK, exist_ok=True)
+    keys = hwdetect.todo([t["key"] for t in wanted], PACK, args.force)
+    by_key = {t["key"]: t for t in wanted}
+    est = sum(min(4 * t["width"], 2048) * min(4 * t["height"], 2048) * 4 // 3 for t in wanted) >> 20
+    plan = hwdetect.plan_build(machine(), est, os.environ.get("NFSMW_GPU"))
+    if plan.refuse_reason:
+        sys.exit(f"speedbreaker-texpack: {plan.refuse_reason}")
+    say(f"this machine: {plan.why}")
+    if plan.warn_slow and not args.yes:
+        say("only integrated graphics here: upscaling will take hours. You can build on a faster PC and copy the")
+        say(f"texture-pack folder over instead. Carry on? [y/N] ", )
+        if input().strip().lower() not in ("y", "yes"):
+            return 1
+    m = model(os.path.join(HERE, "models.json"), args.model)
+    say(f"model: {m['id']} ({m['license']}, by {m['author']}); {len(keys)} of {len(wanted)} textures to do, about {est} MB in all")
+    upscaler, encoder = find_tool("realesrgan-ncnn-vulkan"), find_tool("texpack-encode")
+    done = drift = failed = 0
+    start = time.time()
+    for c in range(0, len(keys), CHUNK):
+        chunk = keys[c:c + CHUNK]
+        pad_dir, up_dir = os.path.join(WORK, "pad"), os.path.join(WORK, "up")
+        for d in (pad_dir, up_dir):
+            shutil.rmtree(d, ignore_errors=True)
+            os.makedirs(d)
+        pads = {k: max(0, min(8, by_key[k]["width"] // 2, by_key[k]["height"] // 2)) for k in chunk}
+        jobs = os.path.join(WORK, "pad.tsv")
+        with open(jobs, "w") as f:
+            for k in chunk:
+                f.write(f"{os.path.join(WORK, 'src', k + '.png')}\t{os.path.join(pad_dir, k + '.png')}\t{pads[k]}\n")
+        run([encoder, "--pad-batch", jobs, "--jobs", str(plan.jobs_encode)], stdout=subprocess.DEVNULL)
+        r = run([upscaler, "-i", pad_dir, "-o", up_dir, "-m", MODELS, "-n", m["id"], "-s", str(m["scale"]), "-t", str(plan.tile),
+                 "-g", str(plan.gpu_index), "-j", plan.jobs_upscale, "-f", "png"], stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if r.returncode != 0:
+            sys.exit(f"speedbreaker-texpack: the upscaler failed: {r.stderr[-500:]}")
+        with open(jobs, "w") as f:
+            for k in chunk:
+                t = by_key[k]
+                f.write(f"{os.path.join(WORK, 'src', k + '.png')}\t{os.path.join(up_dir, k + '.png')}\t"
+                        f"{os.path.join(PACK, k + '.dds')}\t{t['alpha']}\t{pads[k]}\n")
+        r = run([encoder, "--batch", jobs, "--jobs", str(plan.jobs_encode)], capture_output=True)
+        for line in r.stdout.splitlines():
+            status = line.split()[1] if len(line.split()) > 1 else "error"
+            done += status == "ok"
+            drift += status == "drift"
+            failed += status == "error"
+        elapsed = time.time() - start
+        left = len(keys) - (c + len(chunk))
+        eta = elapsed / (c + len(chunk)) * left
+        say(f"{c + len(chunk)}/{len(keys)}: {done} made, {drift} kept original (colour drift), {failed} failed; "
+            f"{elapsed / 60:.1f} min so far, about {eta / 60:.1f} min left")
+    shutil.rmtree(os.path.join(WORK, "pad"), ignore_errors=True)
+    shutil.rmtree(os.path.join(WORK, "up"), ignore_errors=True)
+    count = len([f for f in os.listdir(PACK) if f.endswith(".dds")])
+    with open(os.path.join(PACK, "pack.json.partial"), "w") as f:
+        json.dump({"version": 1, "region": reg, "model": m["id"], "model_license": m["license"],
+                   "created": datetime.datetime.now().isoformat(timespec="seconds"), "count": count, "ui": not args.no_ui}, f, indent=1)
+    os.replace(os.path.join(PACK, "pack.json.partial"), os.path.join(PACK, "pack.json"))
+    say(f"done: {count} HD textures in {PACK} ({sum(os.path.getsize(os.path.join(PACK, f)) for f in os.listdir(PACK)) >> 20} MB)")
+    return 0
+
+
+def status(_args):
+    def folder(d, ext):
+        files = [f for f in os.listdir(d) if f.endswith(ext)] if os.path.isdir(d) else []
+        return len(files), sum(os.path.getsize(os.path.join(d, f)) for f in files) >> 20
+    n, mb = folder(PACK, ".dds")
+    meta = {}
+    try:
+        meta = json.load(open(os.path.join(PACK, "pack.json")))
+    except (OSError, ValueError):
+        pass
+    say(f"pack: {PACK}: {n} textures, {mb} MB" + (f", {meta.get('region')}, model {meta.get('model')}, built {meta.get('created')}" if meta else
+                                                  " (no pack.json: not finished)"))
+    cn, cmb = folder(CAPTURE, ".blk")
+    say(f"play-capture: {CAPTURE}: {cn} textures, {cmb} MB")
+    return 0
+
+
+def remove(args):
+    if not os.path.isdir(PACK):
+        say("no pack to remove")
+        return 0
+    if not args.yes:
+        say(f"delete {PACK} and everything in it? [y/N] ")
+        if input().strip().lower() not in ("y", "yes"):
+            return 1
+    shutil.rmtree(PACK)
+    say(f"removed {PACK}")
+    return 0
+
+
+def main():
+    p = argparse.ArgumentParser(prog="speedbreaker-texpack", description="Build SpeedBreaker's AI-upscaled HD texture pack.")
+    sub = p.add_subparsers(dest="cmd", required=True)
+    b = sub.add_parser("build")
+    b.add_argument("--yes", action="store_true")
+    b.add_argument("--force", action="store_true")
+    b.add_argument("--no-ui", action="store_true")
+    b.add_argument("--model")
+    b.add_argument("--game")
+    sub.add_parser("status")
+    r = sub.add_parser("remove")
+    r.add_argument("--yes", action="store_true")
+    a = p.parse_args()
+    return {"build": build, "status": status, "remove": remove}[a.cmd](a)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

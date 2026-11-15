@@ -175,6 +175,14 @@ target_include_directories(texpack_decode_test PRIVATE ${ROOT})
 sb_test(texpack_extract_test SOURCES ${ROOT}/texpack/extract.cpp ${ROOT}/texpack/archive.cpp ${ROOT}/texpack/jdlz.cpp
     ${ROOT}/texpack/tpk.cpp ${ROOT}/texpack/decode.cpp)
 target_include_directories(texpack_extract_test PRIVATE ${ROOT})
+# ... the encoder: upscaled PNG to BC7 DDS with mips, capped, drift-checked, wrap padding.
+sb_test(texpack_encode_test SOURCES ${ROOT}/texpack/encode.cpp ${ROOT}/texpack/thirdparty/bc7enc/bc7enc.cpp)
+target_include_directories(texpack_encode_test PRIVATE ${ROOT})
+# ... the pack builder's hardware tuning and resume rule (texpack/hwdetect.py).
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+    add_test(NAME texpack_driver_test COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/texpack_driver_test.py)
+endif()
 # Shadow Resolution's Auto: 2x while the scene renders at 2x or more (gpu/shadow_auto.h), as the renderer applies it (GitHub #90).
 sb_test(shadow_auto_test SOURCES ${RT}/video/picture_fit.cpp ${RT}/video/scale_budget.cpp ARGS ${RT}/gpu/renderer.cpp ${RT}/user/settings.cpp)
 if(SB_GLSLANG_VALIDATOR)
