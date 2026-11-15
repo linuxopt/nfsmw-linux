@@ -84,13 +84,27 @@ class Resume(unittest.TestCase):
             self.assertEqual(hwdetect.todo(keys, d, force=False), ["bbbbbbbbbbbbbbbb", "cccccccccccccccc"])
             self.assertEqual(hwdetect.todo(keys, d, force=True), keys)
 
-    def test_stale_files_pruned(self):
+    def test_prune_only_what_is_unwanted(self):
+        # A replacement whose source is gone (capture folder deleted, another --game) stays;
+        # only those the manifest now marks unwanted, and unfinished files, go.
         with tempfile.TemporaryDirectory() as d:
-            for name in ("aaaaaaaaaaaaaaaa.dds", "bbbbbbbbbbbbbbbb.dds", "cccccccccccccccc.dds.partial", "pack.json"):
+            for name in ("aaaaaaaaaaaaaaaa.dds", "bbbbbbbbbbbbbbbb.dds", "dddddddddddddddd.dds", "cccccccccccccccc.dds.partial", "pack.json"):
                 open(os.path.join(d, name), "wb").write(b"x")
-            removed = hwdetect.prune(d, {"aaaaaaaaaaaaaaaa"})
+            removed = hwdetect.prune(d, {"bbbbbbbbbbbbbbbb"})
             self.assertEqual(sorted(removed), ["bbbbbbbbbbbbbbbb.dds", "cccccccccccccccc.dds.partial"])
-            self.assertEqual(sorted(os.listdir(d)), ["aaaaaaaaaaaaaaaa.dds", "pack.json"])
+            self.assertEqual(sorted(os.listdir(d)), ["aaaaaaaaaaaaaaaa.dds", "dddddddddddddddd.dds", "pack.json"])
+
+    def test_unwanted_keys(self):
+        textures = [{"key": "a", "class": "color"}, {"key": "b", "class": "normal"}, {"key": "c", "class": "data"},
+                    {"key": "d", "class": "ui"}]
+        self.assertEqual(hwdetect.unwanted(textures, no_ui=False), {"b", "c"})
+        self.assertEqual(hwdetect.unwanted(textures, no_ui=True), {"b", "c", "d"})
+
+    def test_estimate_counts_what_is_left(self):
+        textures = [{"key": "a", "width": 512, "height": 512}, {"key": "b", "width": 512, "height": 512}]
+        self.assertEqual(hwdetect.estimate_mb(textures, ["a", "b"]), 2 * hwdetect.estimate_mb(textures, ["a"]))
+        self.assertEqual(hwdetect.estimate_mb(textures, []), 0)
+        self.assertEqual(hwdetect.estimate_mb([{"key": "x", "width": 1024, "height": 1024}], ["x"]), 5)  # 2048^2 BC7 + mips
 
     def test_region_from_xex(self):
         self.assertEqual(hwdetect.region_of("aebdf3c14d1e4e4ed2c130d94bc1a0e97bd6d5bf39bdfdef33c3909c9cc4ba4c"), "usa")

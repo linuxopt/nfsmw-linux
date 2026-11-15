@@ -132,7 +132,8 @@ def build(args):
     os.makedirs(PACK, exist_ok=True)
     keys = hwdetect.todo([t["key"] for t in wanted], PACK, args.force)
     by_key = {t["key"]: t for t in wanted}
-    est = sum(min(4 * t["width"], 2048) * min(4 * t["height"], 2048) * 4 // 3 for t in wanted) >> 20
+    total = hwdetect.estimate_mb(wanted, [t["key"] for t in wanted])
+    est = hwdetect.estimate_mb(wanted, keys)  # what's left: a resumed build needs room for that only
     plan = hwdetect.plan_build(machine(), est, os.environ.get("NFSMW_GPU"))
     if plan.refuse_reason:
         sys.exit(f"speedbreaker-texpack: {plan.refuse_reason}")
@@ -143,7 +144,7 @@ def build(args):
         if input().strip().lower() not in ("y", "yes"):
             return 1
     m = model(os.path.join(HERE, "models.json"), args.model)
-    say(f"model: {m['id']} ({m['license']}, by {m['author']}); {len(keys)} of {len(wanted)} textures to do, about {est} MB in all")
+    say(f"model: {m['id']} ({m['license']}, by {m['author']}); {len(keys)} of {len(wanted)} textures to do ({est} MB), about {total} MB in all")
     upscaler, encoder = find_tool("realesrgan-ncnn-vulkan"), find_tool("texpack-encode")
     done = drift = failed = 0
     start = time.time()
@@ -181,7 +182,7 @@ def build(args):
             f"{elapsed / 60:.1f} min so far, about {eta / 60:.1f} min left")
     shutil.rmtree(os.path.join(WORK, "pad"), ignore_errors=True)
     shutil.rmtree(os.path.join(WORK, "up"), ignore_errors=True)
-    stale = hwdetect.prune(PACK, set(by_key))
+    stale = hwdetect.prune(PACK, hwdetect.unwanted(manifest["textures"], args.no_ui))
     if stale:
         say(f"removed {len(stale)} replacements no longer wanted")
     count = len([f for f in os.listdir(PACK) if f.endswith(".dds")])

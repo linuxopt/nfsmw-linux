@@ -647,7 +647,14 @@ namespace gpu::renderer
                 mai.allocationSize = req.size;
                 mai.memoryTypeIndex = memoryType;
                 auto allocationStart = std::chrono::steady_clock::now();
-                Check(vkAllocateMemory(s_dev, &mai, nullptr, &img.memory), "vkAllocateMemory(image)");
+                const VkResult allocated = vkAllocateMemory(s_dev, &mai, nullptr, &img.memory);
+                if (fallible && allocated != VK_SUCCESS)
+                {
+                    // (An HD texture pack replacement: the original stays instead.)
+                    vkDestroyImage(s_dev, img.image, nullptr);
+                    return Image();
+                }
+                Check(allocated, "vkAllocateMemory(image)");
                 s_imageTotals.allocations++;
                 s_imageTotals.allocationNs += SinceNs(allocationStart);
             }
@@ -4525,6 +4532,7 @@ void main()
             };
             std::vector<Dead> graveyard;
             uint64_t residentBytes = 0, loads = 0, evictions = 0, failures = 0, lastLog = 0;
+            uint64_t heapMb = 0, pumpFrame = ~0ull;
             // The worker reads files only (no Vulkan).
             std::mutex mutex;
             std::condition_variable wake;
@@ -4546,6 +4554,28 @@ void main()
             }
         };
         TexpackRuntime s_tp;
+        // Uploads a frame (one 2K replacement with its mips is about 5.6 MB), and how
+        // long a replacement must go unused before the budget may evict it (a texture
+        // sampled every other frame would otherwise be thrown out and read again).
+        constexpr uint64_t kTexpackUploadBytesPerFrame = 24ull << 20;
+        constexpr uint64_t kTexpackIdleFrames = 120;
+
+        // The device memory the game itself uses (all device-local use but the
+        // replacements), where the driver says (VK_EXT_memory_budget); else a guess.
+        uint64_t TexpackGameUsedMb(uint64_t heapMb)
+        {
+            if (!s_memoryBudget)
+                return std::min<uint64_t>(1536, heapMb / 2);
+            VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT };
+            VkPhysicalDeviceMemoryProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, &budget };
+            vkGetPhysicalDeviceMemoryProperties2(s_vk->physical, &props2);
+            uint64_t used = 0;
+            for (uint32_t h = 0; h < props2.memoryProperties.memoryHeapCount; h++)
+                if (props2.memoryProperties.memoryHeaps[h].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+                    used += budget.heapUsage[h];
+            const uint64_t ours = s_tp.residentBytes;
+            return (used > ours ? used - ours : 0) >> 20;
+        }
 
         void TexpackWorker()
         {
@@ -4604,21 +4634,18 @@ void main()
                 fprintf(stderr, "[texpack] no HD texture pack: %s\n", why.c_str());
                 return;
             }
-            uint64_t usedMb = 2048;  // the game's own, where the driver can't say
-            if (s_memoryBudget)
-            {
-                VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT };
-                VkPhysicalDeviceMemoryProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, &budget };
-                vkGetPhysicalDeviceMemoryProperties2(s_vk->physical, &props2);
-                usedMb = 0;
-                for (uint32_t h = 0; h < props2.memoryProperties.memoryHeapCount; h++)
-                    if (props2.memoryProperties.memoryHeaps[h].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
-                        usedMb += budget.heapUsage[h] >> 20;
-            }
+            s_tp.heapMb = heapMb;
+            const uint64_t usedMb = TexpackGameUsedMb(heapMb);
             uint64_t budgetMb = texpack::TexpackBudgetMb(heapMb, usedMb);
             if (const char* b = std::getenv("NFSMW_TEXPACK_BUDGET_MB"); b && std::atoll(b) > 0)
                 budgetMb = uint64_t(std::atoll(b));
             s_tp.budgetBytes = budgetMb << 20;
+            if (budgetMb == 0 && s_tp.choice.on)
+            {
+                fprintf(stderr, "[texpack] no device memory to spare for HD textures (%llu MB, the game using %llu MB): off\n",
+                    (unsigned long long)heapMb, (unsigned long long)usedMb);
+                s_tp.choice.on = false;
+            }
             fprintf(stderr, "[texpack] %zu HD textures in %s; %s, up to %u px%s, budget %llu MB (%s GPU %llu MB, the game using %llu MB, scene at %.2gx)\n",
                 pack->Count(), dir.c_str(), s_tp.choice.on ? "on" : "off (HD Textures)", s_tp.choice.capPx,
                 s_tp.choice.minOriginalPx ? std::format(" (originals of {} px or more)", s_tp.choice.minOriginalPx).c_str() : "",
@@ -4672,15 +4699,17 @@ void main()
             return view;
         }
 
-        // Room for `bytes` more: evicts replacements not used this frame,
-        // least recently used first. False if it can't make the room.
+        // Room for `bytes` more: evicts replacements unused for kTexpackIdleFrames,
+        // least recently used first. False if it can't make the room (the
+        // newcomer then waits: it isn't asked for again for a while).
         bool TexpackMakeRoom(uint64_t bytes, bool& invalidate)
         {
             while (s_tp.residentBytes + bytes > s_tp.budgetBytes)
             {
                 auto victim = s_tp.resident.end();
                 for (auto it = s_tp.resident.begin(); it != s_tp.resident.end(); ++it)
-                    if (it->second.lastFrame < s_frame && (victim == s_tp.resident.end() || it->second.lastFrame < victim->second.lastFrame))
+                    if (it->second.lastFrame + kTexpackIdleFrames < s_frame &&
+                        (victim == s_tp.resident.end() || it->second.lastFrame < victim->second.lastFrame))
                         victim = it;
                 if (victim == s_tp.resident.end())
                     return false;
@@ -4724,9 +4753,23 @@ void main()
             TexpackInvalidate();
         }
 
-        // Each lookup: frees what the GPU is done with, uploads a few finished reads.
+        // The budget, again from the game's memory use now (it grows as areas load).
+        void TexpackRefreshBudget()
+        {
+            if (const char* b = std::getenv("NFSMW_TEXPACK_BUDGET_MB"); b && std::atoll(b) > 0)
+                return;
+            s_tp.budgetBytes = texpack::TexpackBudgetMb(s_tp.heapMb, TexpackGameUsedMb(s_tp.heapMb)) << 20;
+            bool invalidate = false;
+            TexpackMakeRoom(0, invalidate);
+            if (invalidate)
+                TexpackInvalidate();
+        }
+
+        // Once a frame (the first texture lookup): frees what the GPU is done with,
+        // refreshes the budget now and then, uploads finished reads within a byte budget.
         void TexpackPump()
         {
+            s_tp.pumpFrame = s_frame;
             if (s_tp.settingFrame != s_frame)
             {
                 s_tp.settingFrame = s_frame;
@@ -4743,7 +4786,7 @@ void main()
                 for (size_t i = 0; i < s_tp.graveyard.size();)
                 {
                     TexpackRuntime::Dead& dead = s_tp.graveyard[i];
-                    if (s_completedSubmission >= dead.submission && completed >= dead.submission)
+                    if (completed >= dead.submission)
                     {
                         for (VkImageView v : dead.views)
                             vkDestroyImageView(s_dev, v, nullptr);
@@ -4758,6 +4801,7 @@ void main()
             if (s_frame >= s_tp.lastLog + 600)
             {
                 s_tp.lastLog = s_frame;
+                TexpackRefreshBudget();
                 fprintf(stderr, "[texpack] %zu resident (%llu of %llu MB), %llu loaded, %llu evicted, %llu failed, %zu waiting\n",
                     s_tp.resident.size(), (unsigned long long)(s_tp.residentBytes >> 20), (unsigned long long)(s_tp.budgetBytes >> 20),
                     (unsigned long long)s_tp.loads, (unsigned long long)s_tp.evictions, (unsigned long long)s_tp.failures, s_tp.requested.size());
@@ -4768,7 +4812,7 @@ void main()
             {
                 std::lock_guard lock(s_tp.mutex);
                 uint64_t bytes = 0;
-                while (!s_tp.ready.empty() && batch.size() < 4 && bytes < (8ull << 20))
+                while (!s_tp.ready.empty() && (batch.empty() || bytes + s_tp.ready.front().second.data.size() <= kTexpackUploadBytesPerFrame))
                 {
                     bytes += s_tp.ready.front().second.data.size();
                     batch.push_back(std::move(s_tp.ready.front()));
@@ -4780,6 +4824,8 @@ void main()
             for (auto& [key, img] : batch)
             {
                 s_tp.requested.erase(key);
+                if (s_tp.resident.count(key))
+                    continue;  // (a read from before an HD Textures change)
                 if (img.data.empty())
                 {
                     s_tp.failures++;
@@ -5829,7 +5875,7 @@ void main()
 
         VkImageView GetTexture(uint32_t slot, TexDim dim, VkSampler& sampler)
         {
-            if (s_tp.pack)
+            if (s_tp.pack && s_tp.pumpFrame != s_frame)
                 TexpackPump();
             TextureCache& c = *s_textureCache;
             if (!c.on)
@@ -7626,6 +7672,12 @@ void main()
                     }
                     if (fused)
                     {
+                        // It now holds what the GPU drew, not the art its HD replacement was made from.
+                        if (fused->packKey)
+                        {
+                            fused->packKey = 0;
+                            TexpackInvalidate();
+                        }
                         rc.texWrite = 1;
                         rc.texEndian = fused->endian;
                         rc.texConvert = fused->convert;

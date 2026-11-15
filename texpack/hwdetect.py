@@ -100,13 +100,30 @@ def region_of(xex_sha256):
     return REGIONS.get(xex_sha256)
 
 
-def prune(pack_dir, wanted_keys):
-    """Removes the pack's replacements no longer wanted (a texture now classed a normal map, or
-    left out by --no-ui) and unfinished .partial files; returns the names removed."""
+def unwanted(textures, no_ui=False):
+    """The keys the manifest says the pack must not hold: normal maps and data
+    textures (never upscaled), and UI ones when the build leaves UI out."""
+    return {t["key"] for t in textures if t["class"] in ("normal", "data") or (no_ui and t["class"] == "ui")}
+
+
+def prune(pack_dir, unwanted_keys):
+    """Removes replacements the manifest now marks unwanted (unwanted()) and unfinished
+    .partial files; returns the names removed. A replacement whose source is merely
+    missing this time (the capture folder deleted, another game folder) stays."""
     removed = []
     for name in os.listdir(pack_dir):
-        key = name[:16]
-        if name.endswith(".dds.partial") or (name.endswith(".dds") and len(name) == 20 and key not in wanted_keys):
+        if name.endswith(".dds.partial") or (name.endswith(".dds") and len(name) == 20 and name[:16] in unwanted_keys):
             os.remove(os.path.join(pack_dir, name))
             removed.append(name)
     return removed
+
+
+def estimate_mb(textures, keys):
+    """The pack's size for `keys`: each 4x (long side at most 2048) as BC7, a byte a
+    texel, plus a third for its mips."""
+    by_key = {t["key"]: t for t in textures}
+    total = 0
+    for k in keys:
+        t = by_key[k]
+        total += min(4 * t["width"], 2048) * min(4 * t["height"], 2048) * 4 // 3
+    return total >> 20

@@ -41,7 +41,16 @@ int main(int argc, char** argv)
     CHECK(has("texpack::Eligible(in)"), "only eligible textures");
     CHECK(has("[texpack] rehash"), "a reload whose key changed is noticed");
     CHECK(has("t.packKey != key"), "and compared before a replacement is reused");
-    CHECK(has("s_completedSubmission >= dead.submission"), "evicted images wait for the GPU");
+    CHECK(has("completed >= dead.submission") && !has("s_completedSubmission >= dead.submission"),
+        "evicted images wait for the GPU, read under its lock");
+    // Final review fixes.
+    CHECK(has("fused->packKey = 0"), "a resolve into a texture drops its replacement (it now shows rendered content)");
+    CHECK(has("s_tp.pumpFrame != s_frame") && has("kTexpackUploadBytesPerFrame"), "uploads once a frame, within a byte budget");
+    CHECK(has("TexpackRefreshBudget("), "the budget follows the game's real memory use");
+    CHECK(has("if (fallible && allocated != VK_SUCCESS)"), "a replacement whose memory can't be had is skipped, not fatal");
+    CHECK(has("budgetMb == 0"), "no budget: HD textures off");
+    CHECK(has("kTexpackIdleFrames"), "only replacements idle a while are evicted");
+    CHECK(has("s_tp.resident.count(key)"), "a key already resident isn't uploaded twice");
     CHECK(has("TexpackTouch("), "lookup cache hits keep replacements recently used");
 
     if (s_failures)
