@@ -359,6 +359,10 @@ if(TARGET sb_launcher_core)
     target_link_libraries(launcher_keys_test PRIVATE sb_launcher_core)
     sb_test(launcher_rules_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_rules_out)
     target_link_libraries(launcher_rules_test PRIVATE sb_launcher_core)
+    sb_test(launcher_saves_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_saves_out)
+    target_link_libraries(launcher_saves_test PRIVATE sb_launcher_core)
+    sb_test(launcher_sbsave_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_sbsave_out)
+    target_link_libraries(launcher_sbsave_test PRIVATE sb_launcher_core)
 endif()
 # The desktop launcher's save (settings::SaveTouched): only the file's options
 # and the changed ones, so defaults stay defaults.
