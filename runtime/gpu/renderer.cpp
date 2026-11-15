@@ -24,6 +24,7 @@
 #include "anisotropy_auto.h"
 #include "shadow_auto.h"
 #include "split_views.h"
+#include "texture_layout.h"
 #include "xenos/registers.h"
 
 #include <kernel/vmem.h>
@@ -3917,32 +3918,21 @@ namespace gpu::renderer
 
         bool GetTextureFormat(uint32_t f, TextureFormatInfo& out)
         {
-            switch (f)
-            {
-            case 2: out = { VK_FORMAT_R8_UNORM, 0, 1, 0 }; return true;
-            case 3: out = { VK_FORMAT_R8G8B8A8_UNORM, 1, 1, 2 }; return true;
-            case 4: out = { VK_FORMAT_R8G8B8A8_UNORM, 1, 1, 1 }; return true;
-            case 6: case 14: out = { VK_FORMAT_R8G8B8A8_UNORM, 2, 1, 0 }; return true;
-            case 7: out = { VK_FORMAT_A2B10G10R10_UNORM_PACK32, 2, 1, 0 }; return true;
-            case 10: out = { VK_FORMAT_R8G8_UNORM, 1, 1, 0 }; return true;
-            case 15: out = { VK_FORMAT_R8G8B8A8_UNORM, 1, 1, 3 }; return true;
-            case 18: out = { VK_FORMAT_BC1_RGBA_UNORM_BLOCK, 3, 4, 0 }; return true;
-            case 19: out = { VK_FORMAT_BC2_UNORM_BLOCK, 4, 4, 0 }; return true;
-            case 20: out = { VK_FORMAT_BC3_UNORM_BLOCK, 4, 4, 0 }; return true;
-            case 22: case 23: out = { VK_FORMAT_R32_SFLOAT, 2, 1, 4 }; return true;
-            case 24: out = { VK_FORMAT_R16_UNORM, 1, 1, 0 }; return true;
-            case 25: out = { VK_FORMAT_R16G16_UNORM, 2, 1, 0 }; return true;
-            case 26: out = { VK_FORMAT_R16G16B16A16_UNORM, 3, 1, 0 }; return true;
-            case 30: out = { VK_FORMAT_R16_SFLOAT, 1, 1, 0 }; return true;
-            case 31: out = { VK_FORMAT_R16G16_SFLOAT, 2, 1, 0 }; return true;
-            case 32: out = { VK_FORMAT_R16G16B16A16_SFLOAT, 3, 1, 0 }; return true;
-            case 36: out = { VK_FORMAT_R32_SFLOAT, 2, 1, 0 }; return true;
-            case 37: out = { VK_FORMAT_R32G32_SFLOAT, 3, 1, 0 }; return true;
-            case 38: out = { VK_FORMAT_R32G32B32A32_SFLOAT, 4, 1, 0 }; return true;
-            case 49: out = { VK_FORMAT_BC5_UNORM_BLOCK, 4, 4, 0 }; return true;
-            default: return false;
-            }
+            texlayout::FormatInfo fi{};
+            if (!texlayout::GetFormat(f, fi))
+                return false;
+            out = { VkFormat(fi.vkFormat), fi.bpbLog2, fi.block, fi.convert };
+            return true;
         }
+        static_assert(texlayout::kVkR8 == VK_FORMAT_R8_UNORM && texlayout::kVkRg8 == VK_FORMAT_R8G8_UNORM &&
+            texlayout::kVkRgba8 == VK_FORMAT_R8G8B8A8_UNORM && texlayout::kVkA2b10g10r10 == VK_FORMAT_A2B10G10R10_UNORM_PACK32 &&
+            texlayout::kVkR16 == VK_FORMAT_R16_UNORM && texlayout::kVkR16f == VK_FORMAT_R16_SFLOAT &&
+            texlayout::kVkRg16 == VK_FORMAT_R16G16_UNORM && texlayout::kVkRg16f == VK_FORMAT_R16G16_SFLOAT &&
+            texlayout::kVkRgba16 == VK_FORMAT_R16G16B16A16_UNORM && texlayout::kVkRgba16f == VK_FORMAT_R16G16B16A16_SFLOAT &&
+            texlayout::kVkR32f == VK_FORMAT_R32_SFLOAT && texlayout::kVkRg32f == VK_FORMAT_R32G32_SFLOAT &&
+            texlayout::kVkRgba32f == VK_FORMAT_R32G32B32A32_SFLOAT && texlayout::kVkBc1 == VK_FORMAT_BC1_RGBA_UNORM_BLOCK &&
+            texlayout::kVkBc2 == VK_FORMAT_BC2_UNORM_BLOCK && texlayout::kVkBc3 == VK_FORMAT_BC3_UNORM_BLOCK &&
+            texlayout::kVkBc5 == VK_FORMAT_BC5_UNORM_BLOCK, "gpu/texture_layout.h's VkFormat values");
 
         // Stored as resolves write it: one 32-bit word a texel, unconverted
         // (the formats a scaled texture can have).
@@ -3951,16 +3941,7 @@ namespace gpu::renderer
             return fi.bpbLog2 == 2 && (fi.convert == 0 || (shadowMap && fi.convert == 4)) && fi.block == 1;
         }
 
-        uint32_t Tiled2D(uint32_t x, uint32_t y, uint32_t pitchAligned, uint32_t bppLog2)
-        {
-            uint32_t outer = (((y >> 5) * (pitchAligned >> 5)) + (x >> 5)) << 6;
-            uint32_t inner = (((y >> 1) & 7) << 3) | (x & 7);
-            uint32_t oi = (outer | inner) << bppLog2;
-            uint32_t bank = (y >> 4) & 1;
-            uint32_t pipe = ((x >> 3) & 3) ^ (((y >> 3) & 1) << 1);
-            return ((y & 1) << 4) | (pipe << 6) | (bank << 11) | (oi & 0xF) | (((oi >> 4) & 1) << 5) |
-                (((oi >> 5) & 7) << 8) | ((oi >> 8) << 12);
-        }
+        using texlayout::Tiled2D;
 
         uint32_t Log2Ceil(uint32_t v)
         {
@@ -4878,18 +4859,9 @@ void main()
                     s_regs[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6 + 2], s_regs[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6 + 3],
                     s_regs[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6 + 4], s_regs[XE_GPU_REG_SHADER_CONSTANT_FETCH_00_0 + slot * 6 + 5]);
             }
-            uint32_t pitchAligned = 0, rowBytes = 0, size;
-            if (f.tiled)
-            {
-                pitchAligned = (std::max(pitchBlocks, bw + offX) + 31) & ~31u;
-                uint32_t heightAligned = (bh + offY + 31) & ~31u;
-                size = (pitchAligned * heightAligned) << fi.bpbLog2;
-            }
-            else
-            {
-                rowBytes = ((pitchBlocks << fi.bpbLog2) + 255) & ~255u;
-                size = rowBytes * (bh + offY);
-            }
+            const texlayout::FormatInfo layoutFormat{ fi.bpbLog2, fi.block, fi.convert, int(fi.vk) };
+            const texlayout::Base baseLevel = texlayout::BaseLevel(layoutFormat, width, height, pitchBlocks, f.tiled != 0, offX, offY);
+            uint32_t pitchAligned = baseLevel.pitchAligned, rowBytes = baseLevel.rowBytes, size = baseLevel.size;
             // Faces after the first follow at the 4 KB-aligned slice stride.
             uint32_t sliceStride = f.tiled ? (((pitchAligned * ((bh + offY + 31) & ~31u)) << fi.bpbLog2) + 4095) & ~4095u
                                            : ((rowBytes * ((bh + offY + 31) & ~31u)) + 4095) & ~4095u;

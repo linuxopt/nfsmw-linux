@@ -150,6 +150,9 @@ if(SB_GLSLANG_VALIDATOR AND EXISTS ${ROOT}/game/shaders/ps_793a572b6da508d4.bin)
 endif()
 # Anisotropic Filtering's Auto: 16x on a Mac at 1x at every screen shape (gpu/anisotropy_auto.h), as GetSampler applies it.
 sb_test(anisotropy_auto_test SOURCES ${RT}/video/picture_fit.cpp ARGS ${RT}/gpu/renderer.cpp)
+# A texture's base level in guest memory (gpu/texture_layout.h, header only): the
+# renderer and the texture pack extractor compute the same bytes.
+sb_test(texture_layout_test ARGS ${RT}/gpu/renderer.cpp)
 # Shadow Resolution's Auto: 2x while the scene renders at 2x or more (gpu/shadow_auto.h), as the renderer applies it (GitHub #90).
 sb_test(shadow_auto_test SOURCES ${RT}/video/picture_fit.cpp ${RT}/video/scale_budget.cpp ARGS ${RT}/gpu/renderer.cpp ${RT}/user/settings.cpp)
 if(SB_GLSLANG_VALIDATOR)
