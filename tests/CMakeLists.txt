@@ -155,6 +155,8 @@ sb_test(anisotropy_auto_test SOURCES ${RT}/video/picture_fit.cpp ARGS ${RT}/gpu/
 sb_test(texture_layout_test ARGS ${RT}/gpu/renderer.cpp)
 # The texture pack's content key (gpu/texpack_key.h, header only, xxHash XXH3-64).
 sb_test(texpack_key_test)
+# Which textures the texture pack may replace (gpu/texpack_eligible.h, header only).
+sb_test(texpack_eligible_test ARGS ${RT}/gpu/renderer.cpp)
 # Shadow Resolution's Auto: 2x while the scene renders at 2x or more (gpu/shadow_auto.h), as the renderer applies it (GitHub #90).
 sb_test(shadow_auto_test SOURCES ${RT}/video/picture_fit.cpp ${RT}/video/scale_budget.cpp ARGS ${RT}/gpu/renderer.cpp ${RT}/user/settings.cpp)
 if(SB_GLSLANG_VALIDATOR)

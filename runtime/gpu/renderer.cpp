@@ -25,6 +25,8 @@
 #include "shadow_auto.h"
 #include "split_views.h"
 #include "texture_layout.h"
+#include "texpack_eligible.h"
+#include "texpack_key.h"
 #include "xenos/registers.h"
 
 #include <kernel/vmem.h>
@@ -4430,6 +4432,29 @@ void main()
                 }
         }
         std::unordered_map<uint64_t, std::unique_ptr<Texture>> s_textures;
+        // Texture pack keys (gpu/texpack_key.h) of what the renderer loads:
+        // NFSMW_TEXPACK_LOG=1 prints each eligible (re)load's key;
+        // NFSMW_TEXPACK_DUMP=<dir> writes <dir>/<key>.txt once per key (its
+        // format, size and address), to check the extractor's keys against.
+        const bool s_texpackLog = [] { const char* v = std::getenv("NFSMW_TEXPACK_LOG"); return v && v[0] == '1'; }();
+        const std::string s_texpackDump = [] { const char* v = std::getenv("NFSMW_TEXPACK_DUMP"); return std::string(v ? v : ""); }();
+        std::unordered_set<uint64_t> s_texpackDumped;
+        void TexpackNote(uint64_t key, uint32_t format, uint32_t width, uint32_t height, uint32_t base, uint32_t size, bool hit)
+        {
+            const std::string name = texpack::KeyName(key);
+            if (s_texpackLog)
+                fprintf(stderr, "[texpack] key %s fmt %u %ux%u @%08X %s\n", name.c_str(), format, width, height, base, hit ? "hit" : "miss");
+            if (!s_texpackDump.empty() && s_texpackDumped.insert(key).second)
+            {
+                std::error_code ec;
+                std::filesystem::create_directories(s_texpackDump, ec);
+                if (FILE* f = fopen((std::filesystem::path(s_texpackDump) / (name + ".txt")).c_str(), "w"))
+                {
+                    fprintf(f, "format %u\nwidth %u\nheight %u\naddress %08X\nsize %u\n", format, width, height, base, size);
+                    fclose(f);
+                }
+            }
+        }
         // Direct 1x 2D textures by guest address (the latest made there), for
         // resolves that store into them too (DestroyTexture drops its entry).
         std::unordered_map<uint32_t, Texture*> s_directByBase;
@@ -5098,6 +5123,23 @@ void main()
                         return TextureView(t, f.swizzle);
                     }
                     s_hitch.textureBytes += size + mipSize;
+                    if (s_texpackLog || !s_texpackDump.empty())
+                    {
+                        texpack::EligibleIn in;
+                        in.cube = cube;
+                        in.volume = volume;
+                        in.stacked = f.stacked != 0;
+                        in.shadowMap = shadowMap;
+                        in.resolveTarget = t.lend != nullptr || writewatch::GpuWritePending(base, size);
+                        in.layers = layers;
+                        in.offX = offX;
+                        in.offY = offY;
+                        in.format = format;
+                        in.width = width;
+                        in.height = height;
+                        if (texpack::Eligible(in))
+                            TexpackNote(texpack::Key(s_sharedHost + base, size, format, width, height), format, width, height, base, size, false);
+                    }
                     EnsureShadow(base, size);
                     if (mipSize)
                         EnsureShadow(mipBase, mipSize);
