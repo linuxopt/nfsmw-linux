@@ -140,6 +140,12 @@ if(SB_TEXPACK)
     add_subdirectory(texpack)
 endif()
 
+# The desktop launcher (launcher/, Linux): its Qt-free core always, the Qt
+# window with SB_LAUNCHER (launcher/CMakeLists.txt).
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_subdirectory(launcher)
+endif()
+
 option(SB_TESTS "Build the unit tests (tests/)" OFF)
 if(SB_TESTS)
     enable_testing()

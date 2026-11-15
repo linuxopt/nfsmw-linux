@@ -352,6 +352,14 @@ else()
         ARGS ${CMAKE_CURRENT_BINARY_DIR}/settings_out)
 endif()
 target_include_directories(settings_test SYSTEM PRIVATE ${ROOT}/tools/XenonRecomp/thirdparty/tomlplusplus/include)
+# The desktop launcher's Qt-free core (launcher/core/): key capture, what it
+# shows, save profiles, .sbsave archives and backups.
+if(TARGET sb_launcher_core)
+    sb_test(launcher_keys_test)
+    target_link_libraries(launcher_keys_test PRIVATE sb_launcher_core)
+    sb_test(launcher_rules_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_rules_out)
+    target_link_libraries(launcher_rules_test PRIVATE sb_launcher_core)
+endif()
 # The desktop launcher's save (settings::SaveTouched): only the file's options
 # and the changed ones, so defaults stay defaults.
 if(NOT WIN32)
