@@ -98,3 +98,15 @@ def todo(keys, pack_dir, force=False):
 
 def region_of(xex_sha256):
     return REGIONS.get(xex_sha256)
+
+
+def prune(pack_dir, wanted_keys):
+    """Removes the pack's replacements no longer wanted (a texture now classed a normal map, or
+    left out by --no-ui) and unfinished .partial files; returns the names removed."""
+    removed = []
+    for name in os.listdir(pack_dir):
+        key = name[:16]
+        if name.endswith(".dds.partial") or (name.endswith(".dds") and len(name) == 20 and key not in wanted_keys):
+            os.remove(os.path.join(pack_dir, name))
+            removed.append(name)
+    return removed

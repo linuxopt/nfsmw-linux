@@ -176,6 +176,9 @@ def build(args):
             f"{elapsed / 60:.1f} min so far, about {eta / 60:.1f} min left")
     shutil.rmtree(os.path.join(WORK, "pad"), ignore_errors=True)
     shutil.rmtree(os.path.join(WORK, "up"), ignore_errors=True)
+    stale = hwdetect.prune(PACK, set(by_key))
+    if stale:
+        say(f"removed {len(stale)} replacements no longer wanted")
     count = len([f for f in os.listdir(PACK) if f.endswith(".dds")])
     with open(os.path.join(PACK, "pack.json.partial"), "w") as f:
         json.dump({"version": 1, "region": reg, "model": m["id"], "model_license": m["license"],

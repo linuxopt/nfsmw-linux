@@ -63,6 +63,7 @@ namespace settings
         ShadowEdges,     // the sun shadow's edges: Smooth (PCF) or Classic (gpu/shadow_auto.h ShadowEdgesSmooth)
         SharpUi,         // Sharper UI: the front end's magnified art reconstructed (gpu/sharp_ui.h)
         MovieUpscaling,  // how movies are enlarged while they play at 1x (video/upscale.h MoviePass)
+        HdTextures,      // the HD texture pack: Off, Auto, 1K, 2K (gpu/texpack_auto.h); shown only with a pack installed
         WindowWidth,   // hidden: the window's size, remembered between runs
         WindowHeight,  // hidden
         // Hidden: 1 once MigrateShadowResolution turned a pre-v0.2.4 file's
@@ -193,6 +194,8 @@ namespace settings
     // pass, as before; Sharper is FSR 1's EASU with a light RCAS where FSR 1
     // is offered, a clamped Lanczos where it isn't (iPhone, iPad).
     enum class MovieUpscalingMode : int32_t { Original = 0, Sharper = 1 };
+    // HD Textures: gpu/texpack_auto.h's kHdTextures* (renderer.cpp checks they match).
+    constexpr int32_t kHdTexturesAuto = 0, kHdTexturesOff = 1, kHdTextures1K = 2, kHdTextures2K = 3;
     // Anisotropy: 1 (off), 2, 4, 8, 16, or one of these.
     constexpr int32_t kAnisotropyAuto = 0;   // 16x on a discrete GPU or an M-series iPad, 4x on other integrated ones
     constexpr int32_t kAnisotropyGame = -1;  // each texture's own setting, as on the 360

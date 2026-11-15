@@ -191,6 +191,12 @@ namespace settings
             { int32_t(ShadowEdgesMode::Classic), "classic", "Classic" },
         };
 
+        constexpr EnumEntry kHdTexturesEntries[] = {
+            { kHdTexturesOff, "off", "Off" },
+            { kHdTexturesAuto, "auto", "Auto" },
+            { kHdTextures1K, "1k", "1K" },
+            { kHdTextures2K, "2k", "2K" },
+        };
         constexpr EnumEntry kMovieUpscalingEntries[] = {
             { int32_t(MovieUpscalingMode::Original), "original", "Original" },
             { int32_t(MovieUpscalingMode::Sharper), "sharper", "Sharper" },
@@ -385,6 +391,11 @@ namespace settings
                   ? "How the game's 720p movies are enlarged. Sharper: a sharper filter where the movie is drawn into a higher Internal Resolution, FSR 1's edge-aware upscale where it reaches the screen at 1x, for cleaner edges and text. Original: as before."
                   : "How the game's 720p movies are enlarged. Sharper: a sharper filter where the movie is drawn into a higher Internal Resolution, a Lanczos filter where it reaches the screen at 1x. Original: as before.",
               .env = "NFSMW_MOVIE_UPSCALE", .defaultValue = double(MovieUpscalingMode::Sharper), .entries = kMovieUpscalingEntries },
+            // HD Textures (gpu/texpack.h, gpu/texpack_auto.h): the AI-upscaled texture pack.
+            { .id = Id::HdTextures, .category = Category::Graphics, .type = Type::Enum, .apply = Apply::Live,
+              .table = "video", .key = "hd_textures", .label = "HD Textures",
+              .description = "The HD texture pack built from your own game (speedbreaker-texpack): the game's textures upscaled 4x by an AI model, with the original colours kept. Auto loads the size this GPU can afford (2K on 8 GB cards, 1K on smaller ones and integrated graphics) and keeps them within a share of its memory. Off: the original textures.",
+              .env = "NFSMW_HD_TEXTURES", .defaultValue = double(kHdTexturesAuto), .entries = kHdTexturesEntries },
             { .id = Id::WindowWidth, .category = Category::Display, .type = Type::Int, .apply = Apply::Restart, .hidden = true,
               .table = "video", .key = "window_width", .label = "Window Width",
               .description = "The window's width when the game starts.",

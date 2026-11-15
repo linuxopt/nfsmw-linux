@@ -127,6 +127,17 @@ int main(int argc, char** argv)
         CHECK(text.find("mipmaps = false") != std::string::npos, "the file holds the stored mipmaps, not the override");
     }
 
+    // HD Textures (the texture pack, gpu/texpack_auto.h): Auto by default,
+    // its choices by name in the file, an unknown one read as Auto.
+    CHECK(settings::DefaultValue(Id::HdTextures) == 0, "HD Textures defaults to Auto");
+    WriteFile(file, "[video]\nhd_textures = \"1k\"\n");
+    CHECK(settings::Load(file), "loads");
+    CHECK(settings::GetInt(Id::HdTextures) == 2, "1k is 2 (texpack::kHdTextures1K), got %d", settings::GetInt(Id::HdTextures));
+    WriteFile(file, "[video]\nhd_textures = \"off\"\n");
+    CHECK(settings::Load(file) && settings::GetInt(Id::HdTextures) == 1, "off is 1");
+    WriteFile(file, "[video]\nhd_textures = \"bogus\"\n");
+    CHECK(settings::Load(file) && settings::GetInt(Id::HdTextures) == 0, "an unknown value is Auto");
+
     settings::Unsubscribe(listener);
     std::filesystem::remove_all(dir, ec);
     printf("%s (%d failure%s)\n", g_failures ? "FAILED" : "all passed", g_failures, g_failures == 1 ? "" : "s");

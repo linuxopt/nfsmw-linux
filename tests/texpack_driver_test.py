@@ -84,6 +84,14 @@ class Resume(unittest.TestCase):
             self.assertEqual(hwdetect.todo(keys, d, force=False), ["bbbbbbbbbbbbbbbb", "cccccccccccccccc"])
             self.assertEqual(hwdetect.todo(keys, d, force=True), keys)
 
+    def test_stale_files_pruned(self):
+        with tempfile.TemporaryDirectory() as d:
+            for name in ("aaaaaaaaaaaaaaaa.dds", "bbbbbbbbbbbbbbbb.dds", "cccccccccccccccc.dds.partial", "pack.json"):
+                open(os.path.join(d, name), "wb").write(b"x")
+            removed = hwdetect.prune(d, {"aaaaaaaaaaaaaaaa"})
+            self.assertEqual(sorted(removed), ["bbbbbbbbbbbbbbbb.dds", "cccccccccccccccc.dds.partial"])
+            self.assertEqual(sorted(os.listdir(d)), ["aaaaaaaaaaaaaaaa.dds", "pack.json"])
+
     def test_region_from_xex(self):
         self.assertEqual(hwdetect.region_of("aebdf3c14d1e4e4ed2c130d94bc1a0e97bd6d5bf39bdfdef33c3909c9cc4ba4c"), "usa")
         self.assertEqual(hwdetect.region_of("aad15fc218d034de3131f746e0b763dd8049a40dd676efc87667fcaf4fc72694"), "pal_es")

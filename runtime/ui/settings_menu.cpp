@@ -186,6 +186,8 @@ namespace ui
             std::string text = settings::FormatValue(o.id, value);
             if (text == "?")
                 return text;
+            if (o.id == Id::HdTextures && int32_t(value) == settings::kHdTexturesAuto)
+                return std::format("{} ({})", text, gpu::renderer::TexpackAutoName());
             if (o.id == Id::ShadowEdges && int32_t(value) == int32_t(settings::ShadowEdgesMode::Auto))
                 return std::format("{} ({})", text, gpu::renderer::SmoothShadowEdges(int32_t(value)) ? "Smooth" : "Classic");
             if (o.id == Id::InternalResolution || (o.id == Id::ShadowResolution && int32_t(value) == settings::kShadowResolutionAuto))
@@ -265,6 +267,8 @@ namespace ui
                 return false;
             if (o.id == Id::SmoothMotion)
                 return video::HfrOffered() || settings::GetStoredValue(o.id) != 0.0 || settings::GetBool(o.id);
+            if (o.id == Id::HdTextures)
+                return gpu::renderer::TexpackInstalled();
             return true;
         }
 

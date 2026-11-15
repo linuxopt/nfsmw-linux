@@ -28,6 +28,8 @@
 #include "texpack_eligible.h"
 #include "texpack_key.h"
 #include "texpack_capture.h"
+#include "texpack.h"
+#include "texpack_auto.h"
 #include "xenos/registers.h"
 
 #include <kernel/vmem.h>
@@ -4370,6 +4372,9 @@ void main()
             // frame it was last checked in.
             std::vector<uint64_t> verifyHashes;
             uint64_t verifyFrame = 0;
+            // Its key in the HD texture pack (gpu/texpack.h), when the pack holds a
+            // replacement for what it loaded last; 0: none.
+            uint64_t packKey = 0;
         };
         void LoadScaledTexture(Texture& t, uint32_t base, uint32_t pitchBlocks, uint32_t endian);
         // Deferred shadow resolves (see ShadowLend): before `t`'s own image is
@@ -4454,6 +4459,390 @@ void main()
             s_texpackCapture = std::make_unique<texpack::Capture>(dir, uint64_t(2) << 30);
             fprintf(stderr, "[texpack] capture on: %zu textures (%llu MB) in %s already\n", s_texpackCapture->Count(),
                 (unsigned long long)(s_texpackCapture->Bytes() >> 20), dir.c_str());
+        }
+
+        // A fetch constant's 3-bit swizzle selector as a Vulkan component.
+        VkComponentSwizzle SwizzleComponent(uint32_t s)
+        {
+            switch (s & 7)
+            {
+            case 0: return VK_COMPONENT_SWIZZLE_R;
+            case 1: return VK_COMPONENT_SWIZZLE_G;
+            case 2: return VK_COMPONENT_SWIZZLE_B;
+            case 3: return VK_COMPONENT_SWIZZLE_A;
+            case 4: return VK_COMPONENT_SWIZZLE_ZERO;
+            case 5: return VK_COMPONENT_SWIZZLE_ONE;
+            default: return VK_COMPONENT_SWIZZLE_IDENTITY;
+            }
+        }
+
+        // ---------------------------------------------------------------
+        // The HD texture pack (gpu/texpack.h; built by texpack/'s
+        // speedbreaker-texpack). Opened at the first texture load. An eligible
+        // texture (texpack::Eligible) whose key the pack holds gets its
+        // replacement: a BC7 image with its own mips, shared by every texture
+        // with that key, read from disk on a worker thread and uploaded here a
+        // few at a time; until it is resident the original is sampled. HD
+        // Textures' Auto (gpu/texpack_auto.h) picks the size each machine
+        // loads and the budget; past the budget, the replacements not used this
+        // frame go, least recently used first, and are destroyed once the GPU
+        // is done with them. Swapping a replacement in or out makes the lookup
+        // cache forget its views. NFSMW_TEXPACK=0 turns it off;
+        // NFSMW_TEXPACK_CAP=<px> and NFSMW_TEXPACK_BUDGET_MB=<n> override.
+        void TexpackInvalidate();  // (after the lookup cache)
+
+        int32_t HdTexturesSetting()
+        {
+            return settings::GetInt(settings::Id::HdTextures);
+        }
+        static_assert(settings::kHdTexturesAuto == texpack::kHdTexturesAuto && settings::kHdTexturesOff == texpack::kHdTexturesOff &&
+            settings::kHdTextures1K == texpack::kHdTextures1K && settings::kHdTextures2K == texpack::kHdTextures2K, "HD Textures' values");
+
+        struct TexpackRuntime
+        {
+            std::unique_ptr<texpack::Pack> pack;
+            bool tried = false;
+            texpack::TexpackChoice choice;
+            texpack::TexpackDevice device{};
+            int32_t setting = -1;           // HD Textures as `choice` was made for it
+            uint64_t settingFrame = ~0ull;  // the frame it was last checked in
+            uint64_t budgetBytes = 0;
+            struct Replacement
+            {
+                Image image;
+                uint32_t width = 0, height = 0, levels = 0;
+                uint64_t lastFrame = 0, lastSubmission = 0;
+                std::unordered_map<uint32_t, VkImageView> views;
+            };
+            std::unordered_map<uint64_t, Replacement> resident;
+            std::unordered_set<uint64_t> requested;             // with the worker
+            std::unordered_map<uint64_t, uint64_t> retryFrame;  // refused: not asked again before this frame
+            struct Dead
+            {
+                Image image;
+                std::vector<VkImageView> views;
+                uint64_t submission;
+            };
+            std::vector<Dead> graveyard;
+            uint64_t residentBytes = 0, loads = 0, evictions = 0, failures = 0, lastLog = 0;
+            // The worker reads files only (no Vulkan).
+            std::mutex mutex;
+            std::condition_variable wake;
+            std::deque<uint64_t> queue;
+            std::deque<std::pair<uint64_t, texpack::Pack::Image>> ready;
+            std::atomic<bool> anyReady{ false };
+            bool stop = false;
+            std::thread worker;
+            ~TexpackRuntime()
+            {
+                if (!worker.joinable())
+                    return;
+                {
+                    std::lock_guard lock(mutex);
+                    stop = true;
+                }
+                wake.notify_one();
+                worker.join();
+            }
+        };
+        TexpackRuntime s_tp;
+
+        void TexpackWorker()
+        {
+            std::unique_lock lock(s_tp.mutex);
+            for (;;)
+            {
+                s_tp.wake.wait(lock, [] { return s_tp.stop || !s_tp.queue.empty(); });
+                if (s_tp.stop)
+                    return;
+                const uint64_t key = s_tp.queue.front();
+                s_tp.queue.pop_front();
+                const uint32_t capPx = s_tp.choice.capPx;
+                lock.unlock();
+                texpack::Pack::Image img;
+                std::string why;
+                if (!s_tp.pack->Load(key, capPx, img, why))
+                {
+                    fprintf(stderr, "[texpack] %s: %s (the original stays)\n", texpack::KeyName(key).c_str(), why.c_str());
+                    img = texpack::Pack::Image();
+                }
+                lock.lock();
+                s_tp.ready.emplace_back(key, std::move(img));
+                s_tp.anyReady = true;
+            }
+        }
+
+        void TexpackOpen()
+        {
+            s_tp.tried = true;
+            if (const char* v = std::getenv("NFSMW_TEXPACK"); v && v[0] == '0')
+                return;
+            VkPhysicalDeviceProperties props;
+            vkGetPhysicalDeviceProperties(s_vk->physical, &props);
+            VkPhysicalDeviceMemoryProperties mem;
+            vkGetPhysicalDeviceMemoryProperties(s_vk->physical, &mem);
+            uint64_t heapMb = 0;
+            for (uint32_t h = 0; h < mem.memoryHeapCount; h++)
+                if (mem.memoryHeaps[h].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+                    heapMb = std::max<uint64_t>(heapMb, mem.memoryHeaps[h].size >> 20);
+            VkFormatProperties bc7;
+            vkGetPhysicalDeviceFormatProperties(s_vk->physical, VK_FORMAT_BC7_UNORM_BLOCK, &bc7);
+            const double scale = std::min(double(s_renderScale.x.num) / s_renderScale.x.den, double(s_renderScale.y.num) / s_renderScale.y.den);
+            const texpack::TexpackDevice dev{ props.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
+                video::ThisSteamDevice() != video::SteamDevice::Other, (bc7.optimalTilingFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0,
+                heapMb, scale };
+            s_tp.device = dev;
+            s_tp.setting = HdTexturesSetting();
+            s_tp.choice = texpack::AutoTexpack(dev, s_tp.setting);
+            if (const char* cap = std::getenv("NFSMW_TEXPACK_CAP"); cap && std::atoi(cap) > 0 && dev.bc7)
+                s_tp.choice = { true, uint32_t(std::atoi(cap)), 0 };
+            const std::filesystem::path dir = GetUserPath() / "texture-pack";
+            auto pack = std::make_unique<texpack::Pack>();
+            std::string why;
+            if (!pack->Open(dir, region::IsPalEs() ? "pal_es" : region::IsPalDe() ? "pal_de" : "usa", why))
+            {
+                fprintf(stderr, "[texpack] no HD texture pack: %s\n", why.c_str());
+                return;
+            }
+            uint64_t usedMb = 2048;  // the game's own, where the driver can't say
+            if (s_memoryBudget)
+            {
+                VkPhysicalDeviceMemoryBudgetPropertiesEXT budget{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT };
+                VkPhysicalDeviceMemoryProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2, &budget };
+                vkGetPhysicalDeviceMemoryProperties2(s_vk->physical, &props2);
+                usedMb = 0;
+                for (uint32_t h = 0; h < props2.memoryProperties.memoryHeapCount; h++)
+                    if (props2.memoryProperties.memoryHeaps[h].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+                        usedMb += budget.heapUsage[h] >> 20;
+            }
+            uint64_t budgetMb = texpack::TexpackBudgetMb(heapMb, usedMb);
+            if (const char* b = std::getenv("NFSMW_TEXPACK_BUDGET_MB"); b && std::atoll(b) > 0)
+                budgetMb = uint64_t(std::atoll(b));
+            s_tp.budgetBytes = budgetMb << 20;
+            fprintf(stderr, "[texpack] %zu HD textures in %s; %s, up to %u px%s, budget %llu MB (%s GPU %llu MB, the game using %llu MB, scene at %.2gx)\n",
+                pack->Count(), dir.c_str(), s_tp.choice.on ? "on" : "off (HD Textures)", s_tp.choice.capPx,
+                s_tp.choice.minOriginalPx ? std::format(" (originals of {} px or more)", s_tp.choice.minOriginalPx).c_str() : "",
+                (unsigned long long)budgetMb, dev.discrete ? "discrete" : "integrated", (unsigned long long)heapMb, (unsigned long long)usedMb, scale);
+            s_tp.pack = std::move(pack);
+            s_tp.worker = std::thread(TexpackWorker);
+        }
+
+        void TexpackTouch(uint64_t key)
+        {
+            if (auto it = s_tp.resident.find(key); it != s_tp.resident.end())
+            {
+                it->second.lastFrame = s_frame;
+                it->second.lastSubmission = s_submissionCounter;
+            }
+        }
+
+        // The replacement's view (and its level count), or null while it isn't resident (then asked for).
+        VkImageView TexpackView(uint64_t key, uint32_t swizzle, uint32_t& levels)
+        {
+            auto it = s_tp.resident.find(key);
+            if (it == s_tp.resident.end())
+            {
+                auto retry = s_tp.retryFrame.find(key);
+                if (!s_tp.requested.count(key) && (retry == s_tp.retryFrame.end() || retry->second <= s_frame))
+                {
+                    s_tp.requested.insert(key);
+                    {
+                        std::lock_guard lock(s_tp.mutex);
+                        s_tp.queue.push_back(key);
+                    }
+                    s_tp.wake.notify_one();
+                }
+                return VK_NULL_HANDLE;
+            }
+            TexpackTouch(key);
+            TexpackRuntime::Replacement& r = it->second;
+            levels = r.levels;
+            VkImageView& view = r.views[swizzle];
+            if (!view)
+            {
+                VkImageViewCreateInfo vci{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+                vci.image = r.image.image;
+                vci.viewType = VK_IMAGE_VIEW_TYPE_2D;
+                vci.format = VK_FORMAT_BC7_UNORM_BLOCK;
+                vci.components = { SwizzleComponent(swizzle), SwizzleComponent(swizzle >> 3), SwizzleComponent(swizzle >> 6),
+                    SwizzleComponent(swizzle >> 9) };
+                vci.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, r.levels, 0, 1 };
+                Check(vkCreateImageView(s_dev, &vci, nullptr, &view), "vkCreateImageView(texpack)");
+            }
+            return view;
+        }
+
+        // Room for `bytes` more: evicts replacements not used this frame,
+        // least recently used first. False if it can't make the room.
+        bool TexpackMakeRoom(uint64_t bytes, bool& invalidate)
+        {
+            while (s_tp.residentBytes + bytes > s_tp.budgetBytes)
+            {
+                auto victim = s_tp.resident.end();
+                for (auto it = s_tp.resident.begin(); it != s_tp.resident.end(); ++it)
+                    if (it->second.lastFrame < s_frame && (victim == s_tp.resident.end() || it->second.lastFrame < victim->second.lastFrame))
+                        victim = it;
+                if (victim == s_tp.resident.end())
+                    return false;
+                TexpackRuntime::Dead dead{ victim->second.image, {}, victim->second.lastSubmission };
+                for (auto& [swizzle, view] : victim->second.views)
+                    dead.views.push_back(view);
+                s_tp.residentBytes -= victim->second.image.bytes;
+                s_tp.graveyard.push_back(std::move(dead));
+                s_tp.resident.erase(victim);
+                s_tp.evictions++;
+                invalidate = true;
+            }
+            return true;
+        }
+
+        // HD Textures changed (Apply::Live): every replacement goes (destroyed once
+        // the GPU is done with it) and the new choice applies from the next lookup.
+        void TexpackSettingChanged(int32_t setting)
+        {
+            s_tp.setting = setting;
+            const texpack::TexpackChoice choice = texpack::AutoTexpack(s_tp.device, setting);
+            {
+                std::lock_guard lock(s_tp.mutex);
+                s_tp.queue.clear();
+                s_tp.ready.clear();
+                s_tp.anyReady = false;
+                s_tp.choice = choice;
+            }
+            for (auto& [key, r] : s_tp.resident)
+            {
+                TexpackRuntime::Dead dead{ r.image, {}, s_submissionCounter };
+                for (auto& [swizzle, view] : r.views)
+                    dead.views.push_back(view);
+                s_tp.graveyard.push_back(std::move(dead));
+            }
+            s_tp.resident.clear();
+            s_tp.residentBytes = 0;
+            s_tp.requested.clear();
+            s_tp.retryFrame.clear();
+            fprintf(stderr, "[texpack] HD Textures %d: %s, up to %u px\n", setting, choice.on ? "on" : "off", choice.capPx);
+            TexpackInvalidate();
+        }
+
+        // Each lookup: frees what the GPU is done with, uploads a few finished reads.
+        void TexpackPump()
+        {
+            if (s_tp.settingFrame != s_frame)
+            {
+                s_tp.settingFrame = s_frame;
+                if (const int32_t setting = HdTexturesSetting(); setting != s_tp.setting)
+                    TexpackSettingChanged(setting);
+            }
+            if (!s_tp.graveyard.empty())
+            {
+                uint64_t completed;
+                {
+                    std::lock_guard lock(s_submitMutex);
+                    completed = s_completedSubmission;
+                }
+                for (size_t i = 0; i < s_tp.graveyard.size();)
+                {
+                    TexpackRuntime::Dead& dead = s_tp.graveyard[i];
+                    if (s_completedSubmission >= dead.submission && completed >= dead.submission)
+                    {
+                        for (VkImageView v : dead.views)
+                            vkDestroyImageView(s_dev, v, nullptr);
+                        DestroyImage(dead.image);
+                        s_tp.graveyard[i] = std::move(s_tp.graveyard.back());
+                        s_tp.graveyard.pop_back();
+                    }
+                    else
+                        i++;
+                }
+            }
+            if (s_frame >= s_tp.lastLog + 600)
+            {
+                s_tp.lastLog = s_frame;
+                fprintf(stderr, "[texpack] %zu resident (%llu of %llu MB), %llu loaded, %llu evicted, %llu failed, %zu waiting\n",
+                    s_tp.resident.size(), (unsigned long long)(s_tp.residentBytes >> 20), (unsigned long long)(s_tp.budgetBytes >> 20),
+                    (unsigned long long)s_tp.loads, (unsigned long long)s_tp.evictions, (unsigned long long)s_tp.failures, s_tp.requested.size());
+            }
+            if (!s_tp.anyReady.load(std::memory_order_relaxed))
+                return;
+            std::deque<std::pair<uint64_t, texpack::Pack::Image>> batch;
+            {
+                std::lock_guard lock(s_tp.mutex);
+                uint64_t bytes = 0;
+                while (!s_tp.ready.empty() && batch.size() < 4 && bytes < (8ull << 20))
+                {
+                    bytes += s_tp.ready.front().second.data.size();
+                    batch.push_back(std::move(s_tp.ready.front()));
+                    s_tp.ready.pop_front();
+                }
+                s_tp.anyReady = !s_tp.ready.empty();
+            }
+            bool invalidate = false;
+            for (auto& [key, img] : batch)
+            {
+                s_tp.requested.erase(key);
+                if (img.data.empty())
+                {
+                    s_tp.failures++;
+                    s_tp.retryFrame[key] = ~0ull;
+                    continue;
+                }
+                if (!TexpackMakeRoom(img.data.size(), invalidate))
+                {
+                    s_tp.retryFrame[key] = s_frame + 300;
+                    continue;
+                }
+                Image image = CreateImage(VK_IMAGE_TYPE_2D, VK_FORMAT_BC7_UNORM_BLOCK, { img.width, img.height, 1 }, 1,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_ASPECT_COLOR_BIT, 0,
+                    img.levels, nullptr, nullptr, true);
+                if (!image.image)
+                {
+                    s_tp.failures++;
+                    s_tp.retryFrame[key] = s_frame + 600;
+                    continue;
+                }
+                EndPass();
+                Begin();
+                ToGeneral(image.image, VK_IMAGE_ASPECT_COLOR_BIT, 1);
+                bool copied = true;
+                for (uint32_t level = 0; level < img.levels && copied; level++)
+                {
+                    const size_t from = img.levelOffsets[level];
+                    const size_t size = (level + 1 < img.levels ? img.levelOffsets[level + 1] : img.data.size()) - from;
+                    const VkDeviceSize staging = RingAllocate(size);
+                    if (staging == ~VkDeviceSize(0))
+                    {
+                        copied = false;
+                        break;
+                    }
+                    memcpy(s_ringHost + staging, img.data.data() + from, size);
+                    VkBufferImageCopy region{};
+                    region.bufferOffset = staging;
+                    region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1 };
+                    region.imageExtent = { std::max(1u, img.width >> level), std::max(1u, img.height >> level), 1 };
+                    vkCmdCopyBufferToImage(s_cmd, s_ring, image.image, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
+                }
+                FullBarrier();
+                if (!copied)
+                {
+                    s_tp.graveyard.push_back({ image, {}, s_submissionCounter });
+                    s_tp.failures++;
+                    s_tp.retryFrame[key] = ~0ull;
+                    continue;
+                }
+                TexpackRuntime::Replacement r;
+                r.image = image;
+                r.width = img.width;
+                r.height = img.height;
+                r.levels = img.levels;
+                r.lastFrame = s_frame;
+                r.lastSubmission = s_submissionCounter;
+                s_tp.residentBytes += image.bytes;
+                s_tp.resident[key] = std::move(r);
+                s_tp.loads++;
+                invalidate = true;
+            }
+            if (invalidate)
+                TexpackInvalidate();
         }
         void TexpackNote(uint64_t key, uint32_t format, uint32_t width, uint32_t height, uint32_t base, uint32_t size, bool hit)
         {
@@ -4799,18 +5188,7 @@ void main()
             auto& view = t.views[swizzle];
             if (view)
                 return view;
-            auto comp = [](uint32_t s) {
-                switch (s & 7)
-                {
-                case 0: return VK_COMPONENT_SWIZZLE_R;
-                case 1: return VK_COMPONENT_SWIZZLE_G;
-                case 2: return VK_COMPONENT_SWIZZLE_B;
-                case 3: return VK_COMPONENT_SWIZZLE_A;
-                case 4: return VK_COMPONENT_SWIZZLE_ZERO;
-                case 5: return VK_COMPONENT_SWIZZLE_ONE;
-                default: return VK_COMPONENT_SWIZZLE_IDENTITY;
-                }
-            };
+            auto comp = SwizzleComponent;
             // Sampled only (a storable scaled texture's format need not support storage).
             VkImageViewUsageCreateInfo usage{ VK_STRUCTURE_TYPE_IMAGE_VIEW_USAGE_CREATE_INFO, nullptr, VK_IMAGE_USAGE_SAMPLED_BIT };
             VkImageViewCreateInfo vci{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
@@ -5141,7 +5519,10 @@ void main()
                     s_hitch.textureBytes += size + mipSize;
                     if (s_texpackCaptureOn && !s_texpackCapture)
                         StartTexpackCapture();
-                    if (s_texpackLog || !s_texpackDump.empty() || s_texpackCapture)
+                    if (!s_tp.tried)
+                        TexpackOpen();
+                    bool packKeyed = false;
+                    if (s_texpackLog || !s_texpackDump.empty() || s_texpackCapture || s_tp.pack)
                     {
                         texpack::EligibleIn in;
                         in.cube = cube;
@@ -5162,8 +5543,20 @@ void main()
                             TexpackNote(key, format, width, height, base, size, false);
                             if (s_texpackCapture && s_texpackCapture->Want(key, s_texpackBlocks.size()))
                                 s_texpackCapture->Submit(key, { format, uint32_t(f.endianness), width, height }, s_texpackBlocks);
+                            if (s_tp.pack)
+                            {
+                                // The city streams new art into memory a texture held: its key
+                                // changes, and the old replacement must not stay on it.
+                                if (t.packKey != key && t.packKey != 0 && s_texpackLog)
+                                    fprintf(stderr, "[texpack] rehash @%08X %s -> %s\n", base, texpack::KeyName(t.packKey).c_str(),
+                                        texpack::KeyName(key).c_str());
+                                t.packKey = s_tp.pack->Has(key) && std::max(width, height) >= s_tp.choice.minOriginalPx ? key : 0;
+                                packKeyed = true;
+                            }
                         }
                     }
+                    if (!packKeyed)
+                        t.packKey = 0;
                     EnsureShadow(base, size);
                     if (mipSize)
                         EnsureShadow(mipBase, mipSize);
@@ -5319,6 +5712,20 @@ void main()
             }
             if (out && !t.scaled)
                 out->texture = &t;
+            if (t.packKey && s_tp.pack && s_tp.choice.on)
+            {
+                uint32_t levels = 0;
+                if (VkImageView hd = TexpackView(t.packKey, f.swizzle, levels))
+                {
+                    // Its own mips, filtered as mips even where the original had none
+                    // (a 2K texture sampled at its base level would shimmer).
+                    xenos::xe_gpu_texture_fetch_t g = f;
+                    if (g.mip_filter == xenos::TextureFilter::kBaseMap)
+                        g.mip_filter = xenos::TextureFilter::kLinear;
+                    sampler = GetSampler(g, levels - 1);
+                    return hd;
+                }
+            }
             return TextureView(t, f.swizzle);
         }
 
@@ -5374,6 +5781,11 @@ void main()
             return c;
         }();
 
+        void TexpackInvalidate()
+        {
+            s_textureCache->generation++;
+        }
+
         enum class TextureEntryState { kOtherKey, kStale, kValid };
 
         // Whether entry `e` holds this lookup's result now (see above).
@@ -5417,6 +5829,8 @@ void main()
 
         VkImageView GetTexture(uint32_t slot, TexDim dim, VkSampler& sampler)
         {
+            if (s_tp.pack)
+                TexpackPump();
             TextureCache& c = *s_textureCache;
             if (!c.on)
                 return LookupTexture(slot, dim, sampler, nullptr);
@@ -5439,6 +5853,8 @@ void main()
             if (state == TextureEntryState::kValid)
             {
                 c.hits++;
+                if (s_tp.pack && e.texture->packKey)
+                    TexpackTouch(e.texture->packKey);
                 if (s_textureVerify)
                     VerifyTexture(*e.texture, epoch);
                 if (!c.verify)
@@ -12360,6 +12776,19 @@ void main()
         if (s_scaleFixed)
             return s_renderScale;
         return WantedRenderScale(setting, regionW, regionH);
+    }
+
+    bool TexpackInstalled()
+    {
+        return s_tp.pack != nullptr;
+    }
+
+    const char* TexpackAutoName()
+    {
+        if (!s_tp.pack)
+            return "Off";
+        const texpack::TexpackChoice c = texpack::AutoTexpack(s_tp.device, settings::kHdTexturesAuto);
+        return !c.on ? "Off" : c.capPx >= 2048 ? "2K" : "1K";
     }
 
     bool SmoothShadowEdges(int32_t setting)

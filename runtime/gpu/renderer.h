@@ -155,6 +155,10 @@ namespace gpu::renderer
     // shadow edges on this machine (Auto's pick: gpu/shadow_auto.h). For the
     // menu's Auto label. Any thread.
     bool SmoothShadowEdges(int32_t setting);
+    // The HD texture pack (gpu/texpack.h): one is installed (Settings shows HD
+    // Textures only then), and what Auto loads here ("2K", "1K", "Off").
+    bool TexpackInstalled();
+    const char* TexpackAutoName();
     // GLSL to SPIR-V (glslang, through the shader disk cache): stage 0
     // vertex, 1 fragment, 2 compute. Empty on failure, with `log` set.
     std::vector<uint32_t> CompileShader(const std::string& glsl, int stage, std::string& log);

@@ -163,6 +163,8 @@ sb_test(texpack_capture_test SOURCES ${RT}/gpu/texpack_capture.cpp ARGS ${RT}/gp
 sb_test(texpack_pack_test SOURCES ${RT}/gpu/texpack.cpp)
 # HD Textures' Auto: each machine's replacement size and memory budget (gpu/texpack_auto.h, header only).
 sb_test(texpack_auto_test)
+# The renderer loads, swaps and evicts replacements as the design says (read as text).
+sb_test(texpack_renderer_test ARGS ${RT}/gpu/renderer.cpp)
 # The texture pack tools (texpack/), on synthetic files: the disc's archive index.
 sb_test(texpack_archive_test SOURCES ${ROOT}/texpack/archive.cpp)
 target_include_directories(texpack_archive_test PRIVATE ${ROOT})
