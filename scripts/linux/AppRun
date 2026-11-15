@@ -1,0 +1,99 @@
+#!/bin/bash
+# SpeedBreaker AppImage entry point (scripts/linux/make_appimage.sh copies
+# this in). Settings, saves, logs and the installed game live in
+# ~/.local/share/speedbreaker (the AppImage is read-only, so portable mode is
+# not available).
+#
+#   SpeedBreaker.AppImage                  the launcher (lib/launcher), then the game on Play
+#   SpeedBreaker.AppImage --play           the game, without the launcher
+#   SpeedBreaker.AppImage --launcher       the launcher, even when it's set not to open
+#   SpeedBreaker.AppImage --texpack build|status|remove   the HD texture pack
+#   SpeedBreaker.AppImage --texpack capture               play with play-capture on
+#   SpeedBreaker.AppImage <anything else>  the game, as before (a file, installer flags)
+#
+# The game is always started from here, never by the launcher, so the
+# launcher's libraries (Qt) never reach it; and whenever the launcher can't
+# run (no display, a library this system lacks, a crash), the game starts
+# anyway. In SteamOS Game Mode the launcher isn't used: a desktop window
+# there can't be worked with a controller.
+HERE="$(dirname "$(readlink -f "$0")")"
+LAUNCHER="$HERE/lib/launcher/speedbreaker-launcher"
+KPLAY=10  # the launcher's exit code for Play (launcher/app/launcher_window.h kExitPlay)
+
+game() { exec "$HERE/speedbreaker.sh" "$@"; }
+
+# The C and C++ runtimes for the bundled tools, as speedbreaker.sh picks them
+# for the game: the bundled one wherever the system's is older. Sets LOADER
+# (the dynamic loader to run a program with), LIBS (its library path) and
+# use_glibc.
+pick_libs() {
+    local host_loader=/lib64/ld-linux-x86-64.so.2 bundled_loader="$HERE/lib/glibc/ld-linux-x86-64.so.2"
+    loader_version() { "$1" --version 2>/dev/null | sed -n '1s/.* version \([0-9][0-9.]*[0-9]\).*/\1/p'; }
+    cxx_version() { grep -ao 'GLIBCXX_3\.4\.[0-9]*' "$1" 2>/dev/null | sort -uV | tail -1; }
+    older() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | head -1)" = "$1" ]; }  # $1 < $2
+    local host_glibc="" bundled_glibc host_cxx="" bundled_cxx f
+    [ -x "$host_loader" ] && host_glibc="$(loader_version "$host_loader")"
+    bundled_glibc="$(loader_version "$bundled_loader")"
+    use_glibc=0
+    if [ -n "$bundled_glibc" ] && { [ -z "$host_glibc" ] || older "$host_glibc" "$bundled_glibc"; }; then use_glibc=1; fi
+    for f in /usr/lib/libstdc++.so.6 /usr/lib64/libstdc++.so.6 /usr/lib/x86_64-linux-gnu/libstdc++.so.6 /lib/x86_64-linux-gnu/libstdc++.so.6; do
+        if [ -e "$f" ]; then host_cxx="$(cxx_version "$f")"; break; fi
+    done
+    bundled_cxx="$(cxx_version "$HERE/lib/cxx/libstdc++.so.6")"
+    LIBS="$HERE/lib"
+    if [ -n "$bundled_cxx" ] && { [ -z "$host_cxx" ] || older "$host_cxx" "$bundled_cxx"; }; then LIBS="$LIBS:$HERE/lib/cxx"; fi
+    LOADER="$host_loader"
+    if [ "$use_glibc" = 1 ]; then
+        LIBS="$LIBS:$HERE/lib/glibc"
+        LOADER="$bundled_loader"
+    fi
+}
+
+case "${1:-}" in
+    --texpack)
+        shift
+        if [ "${1:-}" = capture ]; then
+            shift
+            NFSMW_TEXPACK_CAPTURE=1 game "$@"
+        fi
+        command -v python3 > /dev/null || { echo "speedbreaker-texpack needs Python 3 (python3), which this system lacks" >&2; exit 1; }
+        pick_libs
+        if [ "$use_glibc" = 1 ]; then
+            export SB_TEXPACK_LOADER="$LOADER" SB_TEXPACK_LIBS="$LIBS"
+        else
+            export LD_LIBRARY_PATH="$LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+        fi
+        export SB_TEXPACK_BIN="$HERE/lib/texpack"
+        exec python3 -B "$HERE/texpack/speedbreaker-texpack" "$@"
+        ;;
+    --play)
+        shift
+        game "$@"
+        ;;
+    --launcher)
+        ;;
+    "")
+        # Game Mode (the game's own rule, video/presenter.cpp DetectGameMode),
+        # or no display at all: straight to the game, without loading Qt.
+        if [ -n "${NFSMW_GAME_MODE:-}" ]; then
+            [ "$NFSMW_GAME_MODE" = 1 ] && game
+        elif [ -n "${GAMESCOPE_WAYLAND_DISPLAY:-}" ] || [ "${XDG_CURRENT_DESKTOP:-}" = gamescope ]; then
+            game
+        fi
+        [ -z "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && game
+        ;;
+    *)
+        game "$@"
+        ;;
+esac
+
+[ -x "$LAUNCHER" ] || game
+pick_libs
+# Qt's library and plugin paths for the launcher's process only.
+QT_PLUGIN_PATH="$HERE/lib/qt/plugins" "$LOADER" --library-path "$LIBS:$HERE/lib/qt" "$LAUNCHER" "$@"
+status=$?
+case "$status" in
+    0) exit 0 ;;
+    "$KPLAY") game ;;
+    *) echo "SpeedBreaker: the launcher couldn't run (exit $status): starting the game" >&2; game ;;
+esac

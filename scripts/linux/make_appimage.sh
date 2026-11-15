@@ -93,38 +93,59 @@ The AI model's weights are not included: speedbreaker-texpack downloads the one
 it uses on first use (texpack/models.json lists each one's licence).
 EOT
 
-cat > "$APPDIR/AppRun" <<'EOF'
-#!/bin/bash
-# SpeedBreaker AppImage entry point: hands off to the bundle's own launcher,
-# which picks the bundled or system glibc/libstdc++ and runs lib/SpeedBreaker.
-# Settings, saves, logs and the installed game live in ~/.local/share/speedbreaker
-# (the AppImage is read-only, so portable mode is not available).
-#
-#   SpeedBreaker.AppImage --texpack build|status|remove   the HD texture pack
-#   SpeedBreaker.AppImage --texpack capture               play with play-capture on
-HERE="$(dirname "$(readlink -f "$0")")"
-if [ "${1:-}" = "--texpack" ]; then
-    shift
-    if [ "${1:-}" = capture ]; then
-        shift
-        NFSMW_TEXPACK_CAPTURE=1 exec "$HERE/speedbreaker.sh" "$@"
-    fi
-    command -v python3 > /dev/null || { echo "speedbreaker-texpack needs Python 3 (python3), which this system lacks" >&2; exit 1; }
-    # The tools were built against a newer C library than some systems have: run them
-    # through the bundled one when the system's is older (as speedbreaker.sh does).
-    v() { "$1" --version 2>/dev/null | sed -n '1s/.* version \([0-9][0-9.]*[0-9]\).*/\1/p'; }
-    host="$(v /lib64/ld-linux-x86-64.so.2)" bundled="$(v "$HERE/lib/glibc/ld-linux-x86-64.so.2")"
-    LIBS="$HERE/lib"
-    if [ -n "$bundled" ] && { [ -z "$host" ] || [ "$(printf '%s\n%s\n' "$host" "$bundled" | sort -V | head -1)" != "$bundled" ]; }; then
-        export SB_TEXPACK_LOADER="$HERE/lib/glibc/ld-linux-x86-64.so.2" SB_TEXPACK_LIBS="$LIBS:$HERE/lib/cxx:$HERE/lib/glibc"
-    else
-        export LD_LIBRARY_PATH="$LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-    fi
-    export SB_TEXPACK_BIN="$HERE/lib/texpack"
-    exec python3 -B "$HERE/texpack/speedbreaker-texpack" "$@"
+# The launcher (launcher/, Qt 6 Widgets): the window before the game. Qt's
+# libraries go in lib/qt and its plugins in lib/qt/plugins, used only by the
+# launcher's process (AppRun runs it through the loader with that library
+# path; the game never sees them). Left to the system, as the AppImage
+# project's excludelist does: the C/C++ runtimes (the bundle's own decide),
+# OpenGL/EGL, X11 and the core xcb library, Wayland's client libraries,
+# fontconfig/freetype/harfbuzz, zlib, expat, D-Bus, systemd, Vulkan.
+LAUNCHER_BIN="$BUILD/launcher/speedbreaker-launcher"
+[ -x "$LAUNCHER_BIN" ] || { echo "make_appimage.sh: no $LAUNCHER_BIN (install Qt 6 Widgets, configure with -DSB_LAUNCHER=ON and build)" >&2; exit 1; }
+QT_PLUGINS="$(qtpaths6 --query QT_INSTALL_PLUGINS 2>/dev/null || echo /usr/lib/qt6/plugins)"
+mkdir -p "$APPDIR/lib/launcher" "$APPDIR/lib/qt/plugins/platforms" "$APPDIR/licenses/qt"
+cp "$LAUNCHER_BIN" "$APPDIR/lib/launcher/"
+strip --strip-unneeded "$APPDIR/lib/launcher/speedbreaker-launcher" 2>/dev/null || true
+cp "$QT_PLUGINS/platforms/libqxcb.so" "$APPDIR/lib/qt/plugins/platforms/"
+[ -e "$QT_PLUGINS/platforms/libqwayland.so" ] && cp "$QT_PLUGINS/platforms/libqwayland.so" "$APPDIR/lib/qt/plugins/platforms/"
+for d in xcbglintegrations wayland-shell-integration wayland-graphics-integration-client; do
+    [ -d "$QT_PLUGINS/$d" ] && cp -r "$QT_PLUGINS/$d" "$APPDIR/lib/qt/plugins/"
+done
+if [ -e "$QT_PLUGINS/wayland-decoration-client/libbradient.so" ]; then
+    mkdir -p "$APPDIR/lib/qt/plugins/wayland-decoration-client"
+    cp "$QT_PLUGINS/wayland-decoration-client/libbradient.so" "$APPDIR/lib/qt/plugins/wayland-decoration-client/"
 fi
-exec "$HERE/speedbreaker.sh" "$@"
-EOF
+host_lib() {
+    case "$1" in
+        libc.so.* | libm.so.* | libmvec.so.* | libpthread.so.* | libdl.so.* | librt.so.* | libresolv.so.* | ld-linux* | */ld-linux* | \
+        libstdc++.so.* | libgcc_s.so.* | libGL.so.* | libEGL.so.* | libGLX.so.* | libOpenGL.so.* | libGLdispatch.so.* | \
+        libdrm.so.* | libgbm.so.* | libX11.so.* | libX11-xcb.so.* | libxcb.so.1 | libXau.so.* | libXdmcp.so.* | libwayland-*.so.* | \
+        libfontconfig.so.* | libfreetype.so.* | libharfbuzz.so.* | libgraphite2.so.* | libexpat.so.* | libz.so.* | \
+        libdbus-1.so.* | libsystemd.so.* | libvulkan.so.*) return 0 ;;
+    esac
+    return 1
+}
+for lib in $(ldd "$APPDIR/lib/launcher/speedbreaker-launcher" $(find "$APPDIR/lib/qt/plugins" -name '*.so') | awk '/=> \// { print $1 "|" $3 }' | sort -u); do
+    name="${lib%%|*}"; path="${lib#*|}"
+    host_lib "$name" && continue
+    [ -e "$APPDIR/lib/$name" ] || [ -e "$APPDIR/lib/qt/$name" ] || cp -L "$path" "$APPDIR/lib/qt/$name"
+done
+strip --strip-unneeded "$APPDIR"/lib/qt/*.so* 2>/dev/null || true
+if [ -d /usr/share/licenses/qt6-base ]; then
+    cp -r /usr/share/licenses/qt6-base/. "$APPDIR/licenses/qt/"
+else
+    echo "make_appimage.sh: no Qt licence folder (/usr/share/licenses/qt6-base)" >&2; exit 1
+fi
+cat > "$APPDIR/licenses/qt/README.txt" <<'EOT'
+The launcher (lib/launcher/speedbreaker-launcher, SpeedBreaker's own, GPL-3.0-or-later)
+uses Qt 6 (lib/qt), under the GNU LGPL version 3 (LGPL-3.0-only.txt here), dynamically
+linked: replace the libraries in lib/qt with your own build of the same Qt version to use
+it. Qt's source: https://download.qt.io/official_releases/qt/. The other files here are
+the licences of code Qt includes. The other libraries in lib/qt come from the build
+system's packages, each under its own licence.
+EOT
+
+cp "$ROOT/scripts/linux/AppRun" "$APPDIR/AppRun"
 chmod 755 "$APPDIR/AppRun"
 
 IMG="$OUT/SpeedBreaker-$VERSION-x86_64.AppImage"
