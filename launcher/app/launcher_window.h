@@ -29,6 +29,13 @@ namespace launcher
     // row's default (launcher/core/release.h), so the launcher shows and
     // saves it as the game would.
     void ApplyReleaseDefaults(const std::filesystem::path& userDir);
+
+    // Before the QApplication: AppRun passes Qt's plugin folder (the
+    // AppImage's lib/qt/plugins) as SB_QT_PLUGINS, not QT_PLUGIN_PATH, which
+    // every program the launcher opens (the file manager for Open Backups
+    // Folder) would inherit and load the AppImage's plugins into its own Qt.
+    // Makes it Qt's library path and removes it from the environment.
+    void TakePluginPath();
 }
 
 class LauncherWindow : public QWidget

@@ -11,7 +11,8 @@ int main(int argc, char** argv)
     for (int i = 1; i < argc; i++)
         printf(" %s", argv[i]);
     const char* qt = std::getenv("QT_PLUGIN_PATH");
-    printf("\nLAUNCHERENV QT=%s\n", qt ? "set" : "unset");
+    const char* own = std::getenv("SB_QT_PLUGINS");
+    printf("\nLAUNCHERENV QT=%s SB=%s\n", qt ? "set" : "unset", own ? "set" : "unset");
     fflush(stdout);
     const char* code = std::getenv("STUB_EXIT");
     return code ? std::atoi(code) : 0;

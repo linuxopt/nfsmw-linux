@@ -7,6 +7,7 @@
 
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QCoreApplication>
 #include <QEvent>
 #include <QGridLayout>
 #include <QGuiApplication>
@@ -35,6 +36,15 @@ void launcher::ApplyReleaseDefaults(const std::filesystem::path& userDir)
     if (language >= 0)
         settings::SetDeviceDefault(settings::Id::GameLanguage, language,
             std::format("the language of the {} disc", release::InstalledRegion(userDir, gameDir)));
+}
+
+void launcher::TakePluginPath()
+{
+    const char* dir = std::getenv("SB_QT_PLUGINS");
+    if (!dir || !*dir)
+        return;
+    QCoreApplication::setLibraryPaths({ QString::fromLocal8Bit(dir) });
+    unsetenv("SB_QT_PLUGINS");
 }
 
 namespace

@@ -89,8 +89,10 @@ esac
 
 [ -x "$LAUNCHER" ] || game
 pick_libs
-# Qt's library and plugin paths for the launcher's process only.
-QT_PLUGIN_PATH="$HERE/lib/qt/plugins" "$LOADER" --library-path "$LIBS:$HERE/lib/qt" "$LAUNCHER" "$@"
+# Qt's libraries and plugins for the launcher's process only: the library
+# path through the loader, the plugin folder in a variable of its own that
+# the launcher takes and removes (programs it opens never inherit either).
+SB_QT_PLUGINS="$HERE/lib/qt/plugins" "$LOADER" --library-path "$LIBS:$HERE/lib/qt" "$LAUNCHER" "$@"
 status=$?
 case "$status" in
     0) exit 0 ;;

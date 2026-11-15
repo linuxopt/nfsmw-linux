@@ -34,6 +34,7 @@ int main(int argc, char** argv)
     if (loaded && !forced && !settings::GetBool(settings::Id::LauncherShowAtStart))
         return launcher::kExitPlay;
 
+    launcher::TakePluginPath();
     QApplication app(argc, argv);
     launcher::ApplyDarkTheme(app);
     QApplication::setApplicationName("SpeedBreaker");

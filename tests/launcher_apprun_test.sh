@@ -36,7 +36,7 @@ has "$out" "GAME " && lacks "$out" LAUNCHER || fail "--play: the game, no launch
 
 out="$(run DISPLAY=:9 STUB_EXIT=10)"
 has "$out" "LAUNCHER" && has "$out" "GAME " || fail "Play (10): launcher then game: $out"
-has "$out" "LAUNCHERENV QT=set" || fail "the launcher gets Qt's plugin path: $out"
+has "$out" "LAUNCHERENV QT=unset SB=set" || fail "the launcher gets Qt's plugin folder privately (not QT_PLUGIN_PATH, which programs it opens would inherit): $out"
 has "$out" "GAMEENV LD=unset QT=unset" || fail "the game gets neither LD_LIBRARY_PATH nor QT_PLUGIN_PATH: $out"
 
 out="$(run DISPLAY=:9 STUB_EXIT=0)"; status=$?

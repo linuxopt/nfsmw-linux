@@ -10,6 +10,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QKeyEvent>
+#include <QLibraryInfo>
 #include <QLabel>
 #include <QListWidget>
 #include <QPushButton>
@@ -103,7 +104,15 @@ int main(int argc, char** argv)
     setenv("XDG_DATA_HOME", (scratch / "data").c_str(), 1);
     setenv("QT_QPA_PLATFORM", "offscreen", 1);
     unsetenv("NFSMW_AA");
+    // AppRun's private plugin folder: taken as Qt's library path, and out of
+    // the environment before any program the launcher opens could inherit it.
+    const QString plugins = QLibraryInfo::path(QLibraryInfo::PluginsPath);  // (the system's: it has offscreen)
+    setenv("SB_QT_PLUGINS", plugins.toLocal8Bit().constData(), 1);
+    unsetenv("QT_PLUGIN_PATH");
+    launcher::TakePluginPath();
     QApplication app(argc, argv);
+    CHECK(!getenv("SB_QT_PLUGINS") && !getenv("QT_PLUGIN_PATH"), "nothing left in the environment");
+    CHECK(QCoreApplication::libraryPaths().contains(plugins), "Qt looks in that folder");
     const fs::path user = GetUserPath();
 
     // Dark, whatever the desktop's theme (offscreen has none: Qt's light default).
