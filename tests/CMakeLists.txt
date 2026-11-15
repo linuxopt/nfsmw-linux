@@ -159,6 +159,8 @@ sb_test(texpack_key_test)
 sb_test(texpack_eligible_test ARGS ${RT}/gpu/renderer.cpp)
 # Play-capture of textures the disc extraction can't reach (gpu/texpack_capture.h).
 sb_test(texpack_capture_test SOURCES ${RT}/gpu/texpack_capture.cpp ARGS ${RT}/gpu/renderer.cpp)
+# The game's texture pack reader (gpu/texpack.h): index, cap by mip level, torn files, region.
+sb_test(texpack_pack_test SOURCES ${RT}/gpu/texpack.cpp)
 # The texture pack tools (texpack/), on synthetic files: the disc's archive index.
 sb_test(texpack_archive_test SOURCES ${ROOT}/texpack/archive.cpp)
 target_include_directories(texpack_archive_test PRIVATE ${ROOT})
