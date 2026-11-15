@@ -1,0 +1,23 @@
+{
+  "comment": "AI upscaling models the texture pack can use (ncnn weights for realesrgan-ncnn-vulkan). Licences per OpenModelDB; every one here allows redistribution. Weights are downloaded on first use and checked against these SHA-256s; none ship with SpeedBreaker.",
+  "source": "https://raw.githubusercontent.com/upscayl/custom-models/4b6d2cfa59c7442af115dfc6e50fd8d7d40b96ef/models/",
+  "models": [
+    { "id": "4xLSDIRCompactC3", "default": true, "scale": 4, "license": "CC-BY-4.0", "author": "Philip Hofmann (Phhofm)",
+      "note": "Chosen by side-by-side comparison on the game's own textures (2026-11-15): closest to the original art, sharp text, cleans DXT compression blocks, fast (compact SRVGGNet).",
+      "files": [
+        { "name": "4xLSDIRCompactC3.param", "sha256": "6e3795fb5b6c68b2c39822e78bf83b575c918f96e9db6c36934a79e7d491d5e1" },
+        { "name": "4xLSDIRCompactC3.bin", "sha256": "692aa5e70c86522ce2d72b94f372751339a2fee65f515d06da5d496d8cf93667" } ] },
+    { "id": "RealESRGAN_General_x4_v3", "scale": 4, "license": "BSD-3-Clause", "author": "Xintao Wang (Real-ESRGAN)",
+      "files": [
+        { "name": "RealESRGAN_General_x4_v3.param", "sha256": "22174924330297357434ad21ed0af7f4b820008d2a502b492754d130d4142714" },
+        { "name": "RealESRGAN_General_x4_v3.bin", "sha256": "85ee266b632a765a725425ba6a5620c088c8aa2939a03063b2d83b3462724cc1" } ] },
+    { "id": "4x_NMKD-Siax_200k", "scale": 4, "license": "WTFPL", "author": "NMKD",
+      "files": [
+        { "name": "4x_NMKD-Siax_200k.param", "sha256": "519bffb4912e295155d3cb5d6a29639d217ccca55f80962d8f677ef777a65b7a" },
+        { "name": "4x_NMKD-Siax_200k.bin", "sha256": "b2abdffa30fb15be752ac681e0c0edf8b543745c33a989aadc9d7d3394dd3110" } ] },
+    { "id": "4xNomos8kSC", "scale": 4, "license": "CC-BY-4.0", "author": "Philip Hofmann (Phhofm)",
+      "files": [
+        { "name": "4xNomos8kSC.param", "sha256": "4576ed5c2fc5fa250d3c3d585ef02248f26abdfc1867088078f501fe71e5d61e" },
+        { "name": "4xNomos8kSC.bin", "sha256": "da16e3880d87b177b7c6b659bbd880f8a101b868eb9ebc08d69eaa6d3edc4517" } ] }
+  ]
+}
