@@ -1,5 +1,8 @@
 // SpeedBreaker runtime. GPL-3.0-or-later (see COPYING). See paths.h.
-#include <stdafx.h>
+#include <filesystem>
+#include <format>
+#include <string>
+#include <system_error>
 #include "paths.h"
 
 #ifndef _WIN32

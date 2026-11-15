@@ -366,6 +366,11 @@ if(TARGET sb_launcher_core)
     sb_test(launcher_backups_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_backups_out)
     target_link_libraries(launcher_backups_test PRIVATE sb_launcher_core)
 endif()
+# The launcher's window, offscreen (SB_LAUNCHER: Qt 6).
+if(TARGET sb_launcher_app)
+    sb_test(launcher_app_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_app_out)
+    target_link_libraries(launcher_app_test PRIVATE sb_launcher_app)
+endif()
 # The desktop launcher's save (settings::SaveTouched): only the file's options
 # and the changed ones, so defaults stay defaults.
 if(NOT WIN32)

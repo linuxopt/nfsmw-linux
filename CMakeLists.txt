@@ -143,6 +143,14 @@ endif()
 # The desktop launcher (launcher/, Linux): its Qt-free core always, the Qt
 # window with SB_LAUNCHER (launcher/CMakeLists.txt).
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    option(SB_LAUNCHER "Build the desktop launcher's window (launcher/, Qt 6 Widgets)" ON)
+    if(SB_LAUNCHER)
+        find_package(Qt6 6.5 QUIET COMPONENTS Widgets)
+        if(NOT Qt6Widgets_FOUND)
+            message(STATUS "SB_LAUNCHER: Qt 6 Widgets not found, the launcher's window isn't built")
+            set(SB_LAUNCHER OFF)
+        endif()
+    endif()
     add_subdirectory(launcher)
 endif()
 
