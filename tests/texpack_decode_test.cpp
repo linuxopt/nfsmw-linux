@@ -95,6 +95,21 @@ int main()
     CHECK(Classify(18, 256, 256, "", "FrontEnd\\FrontEndTextures.tpk") == TexClass::Ui, "front end");
     CHECK(Classify(18, 256, 256, "", "") == TexClass::Color, "a captured texture (no names)");
 
+    // Normal maps without a telling name: their colour gives them away.
+    {
+        std::vector<uint8_t> n(64 * 64 * 4), g(64 * 64 * 4), d(64 * 64 * 4);
+        for (size_t i = 0; i < 64 * 64; i++)
+        {
+            const uint8_t wobble = uint8_t(i % 7);
+            n[i * 4] = uint8_t(124 + wobble); n[i * 4 + 1] = uint8_t(131 - wobble); n[i * 4 + 2] = 238; n[i * 4 + 3] = 255;
+            g[i * 4] = g[i * 4 + 1] = g[i * 4 + 2] = 128; g[i * 4 + 3] = 255;
+            d[i * 4] = d[i * 4 + 1] = d[i * 4 + 2] = 44; d[i * 4 + 3] = 255;
+        }
+        CHECK(texpack::LooksLikeNormalMap(n), "blue-violet field: a normal map");
+        CHECK(!texpack::LooksLikeNormalMap(g), "grey isn't");
+        CHECK(!texpack::LooksLikeNormalMap(d), "dark asphalt isn't");
+    }
+
     if (s_failures)
         fprintf(stderr, "%d failure(s)\n", s_failures);
     else

@@ -208,16 +208,22 @@ namespace texpack
         for (uint32_t y = 0; y < top.h; y++)
             memcpy(&top.px[size_t(y) * top.w * 4], &up.px[(size_t(y + o.pad * scale) * up.w + o.pad * scale) * 4], size_t(top.w) * 4);
 
-        // Alpha from the original.
-        if (o.alpha == "none")
-            for (size_t i = 3; i < top.px.size(); i += 4)
-                top.px[i] = 255;
-        else
+        // Detail transfer: the original's tones, the upscale's detail. The
+        // upscale's low frequencies (it shrunk to the original's size and
+        // enlarged again) are swapped for the original's own (enlarged), so a
+        // model that darkens or tints can't change the art's colour; only
+        // what it adds at fine scale stays. Alpha comes from the original too.
         {
-            std::vector<uint8_t> big(top.px.size());
-            ResizeLanczos(src.px.data(), src.w, src.h, big.data(), top.w, top.h);
-            for (size_t i = 3; i < top.px.size(); i += 4)
-                top.px[i] = o.alpha == "1bit" ? (big[i] >= 128 ? 255 : 0) : big[i];
+            std::vector<uint8_t> base(top.px.size()), small(src.px.size()), low(top.px.size());
+            ResizeLanczos(src.px.data(), src.w, src.h, base.data(), top.w, top.h);
+            ResizeLanczos(top.px.data(), top.w, top.h, small.data(), src.w, src.h);
+            ResizeLanczos(small.data(), src.w, src.h, low.data(), top.w, top.h);
+            for (size_t i = 0; i < top.px.size(); i += 4)
+            {
+                for (int c = 0; c < 3; c++)
+                    top.px[i + c] = uint8_t(std::clamp(int(top.px[i + c]) - int(low[i + c]) + int(base[i + c]), 0, 255));
+                top.px[i + 3] = o.alpha == "none" ? 255 : o.alpha == "1bit" ? (base[i + 3] >= 128 ? 255 : 0) : base[i + 3];
+            }
         }
 
         // The cap.
@@ -235,18 +241,30 @@ namespace texpack
             top = std::move(small);
         }
 
-        // Colour drift against the original.
-        double a[3], b[3];
-        MeanRgb(src, a);
-        MeanRgb(top, b);
-        for (int c = 0; c < 3; c++)
-            if (std::fabs(a[c] - b[c]) > o.maxDrift)
-            {
-                char buf[96];
-                snprintf(buf, sizeof(buf), "colour drift %.1f/255 in channel %d", std::fabs(a[c] - b[c]) * 255, c);
-                info = buf;
-                return EncodeResult::Drift;
-            }
+        // Colour drift against the original: the result shrunk back to the
+        // original's size, over the texels the original shows.
+        double drift = 0;
+        {
+            Image back;
+            back.w = src.w;
+            back.h = src.h;
+            back.px.resize(src.px.size());
+            ResizeLanczos(top.px.data(), top.w, top.h, back.px.data(), src.w, src.h);
+            for (size_t i = 3; i < back.px.size(); i += 4)
+                back.px[i] = src.px[i];
+            double a[3], b[3];
+            MeanRgb(src, a);
+            MeanRgb(back, b);
+            for (int c = 0; c < 3; c++)
+                drift = std::max(drift, std::fabs(a[c] - b[c]));
+        }
+        if (drift > o.maxDrift)
+        {
+            char buf[64];
+            snprintf(buf, sizeof(buf), "colour drift %.1f/255", drift * 255);
+            info = buf;
+            return EncodeResult::Drift;
+        }
 
         // The mip chain, and BC7.
         std::vector<Image> levels{ top };
@@ -319,7 +337,9 @@ namespace texpack
             info = "can't rename " + partial.string();
             return EncodeResult::Error;
         }
-        info = std::to_string(top.w) + "x" + std::to_string(top.h) + ", " + std::to_string(levels.size()) + " levels";
+        char buf[96];
+        snprintf(buf, sizeof(buf), "%ux%u, %zu levels, drift %.1f/255", top.w, top.h, levels.size(), drift * 255);
+        info = buf;
         return EncodeResult::Ok;
     }
 }

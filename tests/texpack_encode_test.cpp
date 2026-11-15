@@ -115,7 +115,8 @@ int main()
         const std::string d = Slurp(o.out);
         CHECK(d.size() > 148 && Le32(d, 12) == 1024 && Le32(d, 16) == 2048, "long side capped at 2048 (height 1024, width 2048)");
     }
-    // Colour drift: refused, nothing written.
+    // A model that shifts the colour (here +40 everywhere): the original's tones
+    // are kept, only the upscale's detail is used, so the result doesn't drift.
     {
         auto src = Pattern(32, 32);
         Png(dir / "c.png", src, 32, 32);
@@ -124,8 +125,8 @@ int main()
         o.src = dir / "c.png";
         o.up = dir / "c_up.png";
         o.out = dir / "c.dds";
-        CHECK(texpack::EncodeTexture(o, info) == texpack::EncodeResult::Drift, "drift refused");
-        CHECK(!fs::exists(o.out), "no file for a refused texture");
+        CHECK(texpack::EncodeTexture(o, info) == texpack::EncodeResult::Ok, info.c_str());
+        CHECK(info.find("drift 0.") != std::string::npos, "the original's tones kept (drift under 1/255)");
     }
     // Wrap padding: 8x8 padded by 2 is 12x12, its corner the opposite corner's texel.
     {

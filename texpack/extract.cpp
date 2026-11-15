@@ -214,6 +214,11 @@ namespace texpack
                     it.cls = TexClass::Data;
                     continue;
                 }
+                if (LooksLikeNormalMap(rgba))
+                {
+                    it.cls = TexClass::Normal;
+                    continue;
+                }
                 bool opaque = true, binary = true;
                 for (size_t p = 3; p < rgba.size(); p += 4)
                 {

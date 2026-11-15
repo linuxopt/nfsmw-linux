@@ -3,12 +3,15 @@
 // The pack's encoder: an original texture's PNG and its AI-upscaled PNG
 // become <key>.dds, BC7 (DX10 header, DXGI_FORMAT_BC7_UNORM), with a full
 // mip chain, its long side at most `maxSide` (Lanczos-3 down when the 4x
-// result is larger). Colour comes from the upscale; alpha from the original,
+// result is larger). Colour: the original's tones with the upscale's detail
+// (detail transfer: the upscale's low frequencies are replaced by the
+// original's, so a model can't darken or tint the art); alpha from the original,
 // enlarged with Lanczos-3 (the model isn't trusted with cut-out edges), and
 // for 1-bit sources thresholded again at every level with the coverage of
 // the top one kept, so fences and foliage don't thin out in the distance. A
-// result whose mean colour drifts more than `maxDrift` (per channel, 0-1)
-// from the original's is refused (Drift): the original stays in use.
+// result whose mean colour still drifts more than `maxDrift` (per channel,
+// 0-1; only clipping can cause it now) is refused (Drift): the original
+// stays in use.
 // Tiling textures: PadWrapped adds `pad` texels of the texture's own
 // opposite edges around it before upscaling, so the model sees the
 // neighbours a seam will have; EncodeTexture's `pad` crops them off after.
