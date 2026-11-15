@@ -133,6 +133,13 @@ endif()
 add_subdirectory(recomp)
 add_subdirectory(runtime)
 
+# The texture pack tools (texpack/): extract the disc's textures, encode the
+# upscaled pack. Separate programs, never linked into the game.
+option(SB_TEXPACK "Build the texture pack tools (texpack/)" OFF)
+if(SB_TEXPACK)
+    add_subdirectory(texpack)
+endif()
+
 option(SB_TESTS "Build the unit tests (tests/)" OFF)
 if(SB_TESTS)
     enable_testing()
