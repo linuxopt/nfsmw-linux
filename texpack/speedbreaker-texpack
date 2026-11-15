@@ -58,6 +58,11 @@ def find_tool(name):
 
 
 def run(cmd, **kw):
+    # In the AppImage the tools run through its own C library where the system's is older
+    # (AppRun sets SB_TEXPACK_LOADER and SB_TEXPACK_LIBS, as speedbreaker.sh does for the game).
+    loader, libs = os.environ.get("SB_TEXPACK_LOADER"), os.environ.get("SB_TEXPACK_LIBS")
+    if loader and libs:
+        cmd = [loader, "--library-path", libs] + list(cmd)
     return subprocess.run(cmd, check=False, text=True, **kw)
 
 
