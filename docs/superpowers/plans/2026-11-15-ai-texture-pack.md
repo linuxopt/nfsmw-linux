@@ -44,6 +44,16 @@ Python 3 stdlib (driver), existing `sb_test` CTest harness.
 4. **Build interrupted or disk full mid-run** → re-run resumes, no half-written `.dds` ever counted as done. Test: Task 9 `test_atomic_resume`.
 5. **Low-memory machine** (2 GB card, Steam Deck) → Auto picks the tier and the budget evicts instead of failing allocations. Test: Task 11 tier table + Task 12 forced-budget run.
 
+## Amendment (after Task 5's gate, player's choice: play-capture)
+
+Task 5's gate measured 63.6%; the player chose play-capture over decoding HUFF (spec §8). Added:
+**Task 5b** (fix the 98 stream and 21 container misses found by the spike), **Task 5c** (renderer
+capture to `texture-capture/`), **Task 5d** (re-measure: disc + capture ≥ 95% of a scripted run's
+eligible textures after one capture run). Task 6's `DecodeBase` becomes
+`DecodeBlocks(format, endian, width, height, blocks, rgba)` on gathered blocks; Task 7's extractor
+writes both sources' PNGs; Task 9's `build` reads `texture-capture/`; Task 14 adds
+`--texpack capture [--drive]`.
+
 ---
 
 ### Task 1: Shared texture layout header (no behaviour change)

@@ -1,6 +1,6 @@
 # AI-upscaled texture pack (disc-extracted) — design
 
-Date: 2026-11-15. Status: draft for approval.
+Date: 2026-11-15. Status: approved; amended 2026-11-15 after the spike (§8).
 
 ## Intent
 
@@ -301,3 +301,21 @@ don't need the player at the controls.
 - The hardware tiers and thresholds in §7 (8 GB / 4 GB, 50% budget, tile sizes).
 - The integrated Radeon 610M on this PC stands in for a low-end machine in testing (§Verification 5).
 - HD Textures defaults to Auto when a pack exists (§5).
+
+## 8. Amendment after the spike: disc extraction plus play-capture
+
+The spike (docs/TEXPACK_FORMAT.md) proved content keys match exactly, once the key hashes only a
+texture's own blocks (`texlayout::GatherBase`; the game writes into tiled padding). Disc extraction
+alone reached 63.6% of the textures a scripted race showed: about a third of the city stream's
+blocks use EA's HUFF compression, which has no decoder here. The player chose to close the gap with
+**play-capture** rather than reverse-engineering HUFF:
+
+- With capture on (`NFSMW_TEXPACK_CAPTURE=1`, set by `--texpack capture`, which starts the game),
+  every eligible texture the renderer loads whose key is in neither the disc extraction nor the pack
+  is written once to `~/.local/share/speedbreaker/texture-capture/<key>.blk` (its gathered blocks,
+  still in guest byte order) with `<key>.json` (format, endian, width, height). Capped at 2 GB.
+- Both sources produce the same thing: a key and its gathered blocks. The decoder works on
+  gathered blocks (untiled already), so disc and captured textures go through one pipeline.
+- The pack build takes both; `--texpack status` reports how many textures came from each.
+- Scripted capture: `--texpack capture --drive` runs the game with an input script that enters free
+  roam and drives, for players who don't want to collect by hand.
