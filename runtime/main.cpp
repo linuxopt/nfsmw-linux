@@ -25,6 +25,7 @@
 #include <install/locate.h>
 #include <install/placement.h>
 #include <install/sha256.h>
+#include <install/title_icon.h>
 #include <platform/quit_signals.h>
 #include <region/region.h>
 #include <report/report.h>
@@ -616,6 +617,8 @@ int main(int argc, char** argv)
     }
     memcpy(g_memory.Translate(image.base), image.data.get(), image.size);
     fprintf(stderr, "[loader] image %08zX-%08zX, entry %08zX\n", image.base, image.base + image.size, image.entry_point);
+    // The window's icon: the game's own, from its dashboard art (install/title_icon.h).
+    video::SetWindowIcon(install::TitleIcon(file, std::span<const uint8_t>(image.data.get(), image.size), image.base));
 
     // Which game files this is, then the whole system summary for the log.
     {

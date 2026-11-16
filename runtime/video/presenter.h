@@ -22,6 +22,11 @@ namespace video
     // window could be created; the game then runs headless.
     bool Initialize();
 
+    // Main thread, after Initialize: the window's icon (title bar, task bar,
+    // switcher), from a PNG: the game's own (install/title_icon.h). Nothing
+    // without a window, on iOS, or when the PNG doesn't decode.
+    void SetWindowIcon(const std::vector<uint8_t>& png);
+
     // Any thread (the command processor): the front buffer to show next.
     // `fetch` is its texture fetch constant (6 dwords, host order).
     void SubmitFrontBuffer(const uint32_t fetch[6], uint32_t width, uint32_t height);

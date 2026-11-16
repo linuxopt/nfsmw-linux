@@ -3915,6 +3915,25 @@ void main()
         }
     }
 
+    void SetWindowIcon(const std::vector<uint8_t>& png)
+    {
+#if !(defined(__APPLE__) && TARGET_OS_IOS) && SDL_VERSION_ATLEAST(3, 4, 0)  // SDL_LoadPNG_IO: SDL 3.4
+        if (!s_window || png.empty())
+            return;
+        SDL_Surface* icon = SDL_LoadPNG_IO(SDL_IOFromConstMem(png.data(), png.size()), true);
+        if (!icon)
+        {
+            fprintf(stderr, "[video] the game's icon doesn't decode: %s\n", SDL_GetError());
+            return;
+        }
+        if (!SDL_SetWindowIcon(s_window, icon))
+            fprintf(stderr, "[video] SDL_SetWindowIcon: %s\n", SDL_GetError());
+        SDL_DestroySurface(icon);
+#else
+        (void)png;
+#endif
+    }
+
     bool Initialize()
     {
         if (const char* h = std::getenv("NFSMW_HEADLESS"); h && h[0] == '1')
