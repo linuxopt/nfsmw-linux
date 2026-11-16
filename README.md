@@ -1,6 +1,7 @@
 # nfsmw-linux
 
-**SpeedBreaker for Linux as one AppImage, with a desktop launcher and an AI HD texture pack.**
+**SpeedBreaker for Linux as one AppImage, with a desktop launcher, an AI HD texture pack and
+online races.**
 
 This is an unofficial fork of [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker)
 v0.2.5, the static recompilation of the Xbox 360 version of *Need for Speed: Most Wanted*
@@ -16,13 +17,13 @@ in it still applies, and this section describes only what this fork adds.
 > texture packs made from them.
 
 <p align="center">
-  <img src="assets/screenshots/nfsmw-linux-launcher.png" alt="The nfsmw-linux launcher window: dark, with tabs for Display, Graphics, Audio, Input, Wheel, Controls, Game, Advanced and Saves; the Graphics tab is open, showing Anti-Aliasing, Upscaling set to FSR 1, Sharpening, Anisotropic Filtering, Mipmaps, Internal Resolution, Shadow options, Sharper UI, Movie Upscaling and HD Textures, with a blue Play button" width="760">
+  <img src="assets/screenshots/nfsmw-linux-launcher.png" alt="The nfsmw-linux launcher window: dark, with tabs for Display, Graphics, Audio, Input, Wheel, Controls, Game, Advanced, Online and Saves; the Graphics tab is open, showing Anti-Aliasing, Upscaling set to FSR 1, Sharpening, Anisotropic Filtering, Mipmaps, Internal Resolution, Shadow options, Sharper UI, Movie Upscaling and HD Textures, with a blue Play button" width="760">
   <br>
   <sub>The launcher: every in-game setting before the game starts.</sub>
 </p>
 
 **Contents:** [Download and run](#download-and-run) · [What's new](#whats-new-in-this-fork) ·
-[The launcher](#the-launcher) · [HD textures](#ai-hd-texture-pack) ·
+[The launcher](#the-launcher) · [HD textures](#ai-hd-texture-pack) · [Online races](#online-races) ·
 [Where your files are](#where-your-files-are) · [Building it yourself](#building-it-yourself) ·
 [Known limitations](#known-limitations) · [Credits](#credits-for-this-fork)
 
@@ -62,13 +63,16 @@ Steam Deck in Desktop Mode.
 
 - **A native Linux AppImage**: one file with the game, its launcher and its tools. No install;
   data goes to `~/.local/share/speedbreaker`, as with the SteamOS bundle.
-- **A desktop launcher** (Qt 6, dark theme): every in-game setting, keyboard controls and save
-  management before the game starts.
+- **A desktop launcher** (Qt 6, dark theme): every in-game setting, keyboard controls, save
+  management and online play (on/off, name, server) before the game starts.
 - **An AI HD texture pack**: the game's own textures upscaled 4x by an AI model and compressed for
   the GPU, keeping the original art, just sharper. It's built on your machine from your install,
   tuned to its hardware, and loads in-game with no frame-rate cost on the test machine.
 - **HD Textures setting** (Settings > Graphics): Auto, 1K, 2K or Off, shown once a pack is
   installed. Auto picks by GPU memory and switches the pack off where it would hurt.
+- **Online races**: the game's own Xbox Live menus (Quick Match: create a race or join one) work
+  again, through a SpeedBreaker online server that stands in for Xbox Live and EA's lobby and
+  relays the race between players, so nobody needs to open a port. See [Online races](#online-races).
 
 ## The launcher
 
@@ -83,6 +87,8 @@ Steam Deck in Desktop Mode.
   Anything that replaces or deletes a save backs it up first, to
   `~/.local/share/speedbreaker/save-backups/`, and the files are flushed to disk before the old
   save goes. Imported files are checked strictly and can only ever write a save profile.
+- **Online**: online play on or off, your name and the server (see [Online races](#online-races)).
+  A name or server that can't be used stops **Play** with a message saying why.
 - **Open this launcher at start**: untick it to go straight to the game next time;
   `--launcher` brings the window back.
 - **It never gets in the way of playing**: in SteamOS Game Mode, or with no display, the game starts
@@ -127,6 +133,32 @@ On the test machine (RX 9070 XT) the full pack is about 2,150 textures, 2 GB, bu
 **Another PC:** build there, or copy the `texture-pack` folder over (it's your own data from your
 own disc; keep it to yourself).
 
+## Online races
+
+Online play is off until you turn it on in the launcher's **Online** page: tick **Play online** and
+pick a name (up to 15 characters; it has to be unique among the players online). The server is
+SpeedBreaker's (`62.3.24.62:39300`) unless you enter another; **Default** puts it back. The game then
+signs in when it starts. In the game: **Xbox Live > Quick Match**, pick Ranked or Unranked and a race
+type. If nobody has a race waiting, choose **Create Game** and wait in the game room; anyone else who
+picks the same Quick Match then joins you, and the race starts when the room is full enough. The
+game's own messages say when the server can't be reached.
+
+<p align="center">
+  <img src="assets/screenshots/nfsmw-linux-online.png" alt="The launcher's Online tab: a ticked Play online box, a Name field with Racer1234, a Server field with 62.3.24.62:39300 and a Default button, and a note that other players see your name and a server-given address, never your IP" width="760">
+  <br>
+  <sub>The launcher's Online page.</sub>
+</p>
+
+The page writes `~/.local/share/speedbreaker/online.toml` (`enabled`, `name`, `server`, and an `id` the
+game adds to tell you apart: keep it), which can also be edited by hand.
+
+- Anyone can run a server:
+  [`scripts/online/`](scripts/online/README.md) has the server (Python, standard library only) and how
+  to host it.
+- Other players only see your name and a `10.80.x.y` address the server gives you, never your IP. The
+  server sees your IP, as any server you connect to does, and passes the race traffic on.
+- Untick **Play online** to go back to offline; your saves are not affected.
+
 ## Where your files are
 
 | What | Where |
@@ -136,6 +168,7 @@ own disc; keep it to yourself).
 | Save backups | `~/.local/share/speedbreaker/save-backups/` |
 | HD texture pack | `~/.local/share/speedbreaker/texture-pack/` |
 | Installed game | `~/.local/share/speedbreaker/game/` (unless you chose another folder) |
+| Online name and server | `~/.local/share/speedbreaker/online.toml` |
 | Logs | `~/.local/share/speedbreaker/last-run.log` |
 
 ## Building it yourself
@@ -171,6 +204,8 @@ The runtime is `runtime-x86_64` from [AppImage/type2-runtime](https://github.com
 - Key labels in the launcher name the US-layout position ("W"), as `settings.toml` stores them.
 - About 39% of the city's textures reach the pack only through `--texpack capture`.
 - Wheel calibration stays in the in-game menu (it needs the live wheel).
+- Online: the server keeps leaderboards in memory only, so a restart clears them; voice chat is
+  off; and if a player quits mid-race, the others finish alone.
 
 ## Credits for this fork
 
@@ -180,7 +215,10 @@ its contributors (GPL-3.0-or-later). The fork adds code under the same licence a
 [Real-ESRGAN-ncnn-vulkan](https://github.com/xinntao/Real-ESRGAN-ncnn-vulkan) and ncnn
 (BSD-3-Clause), [bc7enc](https://github.com/richgel999/bc7enc_rdo) (MIT/public domain),
 [stb](https://github.com/nothings/stb) (MIT/public domain), [xxHash](https://github.com/Cyan4973/xxHash)
-(BSD-2-Clause), and the 4xLSDIRCompactC3 model by Philip Hofmann (CC-BY-4.0, downloaded, not
+(BSD-2-Clause), the [Xenia](https://github.com/xenia-canary/xenia-canary) netplay fork as the reference
+for the console's network and Xbox Live calls (BSD-3-Clause), the protocol notes of the
+[NFSMW Recompiled](https://github.com/victorgbd/nfsmw-server-lan) project for EA's lobby,
+and the 4xLSDIRCompactC3 model by Philip Hofmann (CC-BY-4.0, downloaded, not
 bundled). The source's own licences are in [LICENSES](LICENSES); the AppImage carries the licence of
 everything it bundles in its `licenses/` folder.
 

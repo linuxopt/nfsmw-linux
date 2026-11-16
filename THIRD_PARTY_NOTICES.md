@@ -15,7 +15,7 @@ collected when the bundle is made), and the iPhone and iPad IPA in `SpeedBreaker
 | Project | What it does here | License | Text |
 |---|---|---|---|
 | **Unleashed Recompiled**: hedge-dev and contributors | Parts of the kernel, XAM, memory, heap and threading code are adapted from it (each such file says so at the top). | GPL-3.0-or-later | [`LICENSES/GPL-3.0.txt`](LICENSES/GPL-3.0.txt) |
-| **Xenia**: Copyright Ben Vanik and Xenia contributors | The Xenos GPU register, microcode and format headers are ported from it (`runtime/gpu/xenos/`), as is the NT status table (`runtime/kernel/imports_error.cpp`). Its kernel, XMA and GPU behaviour is the reference throughout. | BSD-3-Clause | [`LICENSES/Xenia-BSD-3-Clause.txt`](LICENSES/Xenia-BSD-3-Clause.txt) |
+| **Xenia**: Copyright Ben Vanik and Xenia contributors | The Xenos GPU register, microcode and format headers are ported from it (`runtime/gpu/xenos/`), as is the NT status table (`runtime/kernel/imports_error.cpp`). Its kernel, XMA and GPU behaviour is the reference throughout, and its netplay fork's (AdrianCassar/xenia-canary) message numbers and structure layouts for the network and Xbox Live calls (`runtime/kernel/imports_net.cpp`, `xmsg_online.cpp`). | BSD-3-Clause | [`LICENSES/Xenia-BSD-3-Clause.txt`](LICENSES/Xenia-BSD-3-Clause.txt) |
 | **freedreno**: Copyright (c) 2012 Rob Clark | Shader instruction formats, through Xenia's `ucode.h`. | MIT | [`LICENSES/freedreno-MIT.txt`](LICENSES/freedreno-MIT.txt) |
 | **XenonRecomp** (XenonUtils): Copyright (c) 2025 hedge-dev and contributors | Recompiles the game's PowerPC code into C++ (with SpeedBreaker's patches, `patches/xenonrecomp/`); its XEX loader is compiled into the runtime. | MIT | [`LICENSES/XenonRecomp-MIT.md`](LICENSES/XenonRecomp-MIT.md) |
 | **libmspack**: (C) 2003-2023 Stuart Caie | LZX decompression of the XEX (`lzxd.c`, through XenonRecomp). | LGPL-2.1 | [`LICENSES/libmspack-LGPL-2.1.txt`](LICENSES/libmspack-LGPL-2.1.txt) |
@@ -77,3 +77,8 @@ for at least three years after a release, its copy is provided at no charge.
 
 The hedge-dev team, for XenonRecomp and the approach of Unleashed Recompiled that SpeedBreaker
 follows, and the Xenia project, for years of Xbox 360 research.
+
+The NFSMW Recompiled project ([nfsmw-server-lan](https://github.com/victorgbd/nfsmw-server-lan)
+and NFSMW-Recompiled-Mobile), whose notes on how this game uses EA's lobby protocol and on what its
+network code needs from the console (the `xmap` entry, sign-in state, unique XUIDs) the online server
+(`scripts/online/`) and runtime follow. No code was taken from it.
