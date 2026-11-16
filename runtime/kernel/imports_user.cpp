@@ -8,6 +8,7 @@
 #include <kernel/function.h>
 #include <kernel/overlapped.h>
 #include <user/paths.h>
+#include <net/online.h>
 
 #include <fstream>
 #include <map>
@@ -271,7 +272,7 @@ uint32_t XamUserGetXUID(uint32_t userIndex, uint32_t typeMask, be<uint64_t>* xui
 {
     if (userIndex != 0)
         return X_ERROR_NO_SUCH_USER;
-    *xuid = kXuid;
+    *xuid = online::Enabled() ? online::PlayerXuid() : kXuid;
     return X_ERROR_SUCCESS;
 }
 
@@ -281,17 +282,19 @@ uint32_t XamUserGetName(uint32_t userIndex, char* buffer, uint32_t bufferLength)
         return X_ERROR_NO_SUCH_USER;
     if (!buffer || bufferLength == 0)
         return X_ERROR_INVALID_PARAMETER;
-    snprintf(buffer, bufferLength, "%s", "Player");
+    snprintf(buffer, bufferLength, "%s", online::Enabled() ? online::PlayerName().c_str() : "Player");
     return X_ERROR_SUCCESS;
 }
 
-// Offline: deny every privilege, as Xenia does (online play, voice,
-// purchases and user content are all gated behind them).
+// Offline, every privilege is denied, as Xenia does (online play, voice,
+// purchases and user content are all gated behind them). With online play
+// set up (net/online.h) multiplayer (254) and the communication and
+// content ones it implies are granted; purchases (245) never are.
 uint32_t XamUserCheckPrivilege(uint32_t userIndex, uint32_t privilege, be<uint32_t>* result)
 {
     if (userIndex != 0 && userIndex != 0xFF)
         return X_ERROR_NO_SUCH_USER;
-    *result = 0;
+    *result = online::Enabled() && privilege != 245 ? 1 : 0;
     return X_ERROR_SUCCESS;
 }
 

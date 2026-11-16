@@ -68,6 +68,8 @@ struct GuestThread
 
     static uint32_t GetCurrentThreadId();
     static void SetLastError(uint32_t error);
+    // SpeedBreaker: the current thread's Win32 last error (TEB + 0x160).
+    static uint32_t GetLastError();
     static void SetDefaultStackSize(size_t size);
     // The current thread's kernel object (for the 0xFFFFFFFE pseudo-handle).
     static KernelObject* GetCurrentThreadObject();

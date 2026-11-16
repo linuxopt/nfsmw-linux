@@ -9,6 +9,7 @@
 #include "function.h"
 #include "overlapped.h"
 #include "xam.h"
+#include "xmsg_online.h"
 
 #include <cpu/guest_thread.h>
 
@@ -125,7 +126,11 @@ namespace
     {
         if (app == 0xFA)
             return XmpDispatch(message, buffer, length);
-        if (app == 0xFB || app == 0xFC)
+        if (app == 0xFB)
+            return XgiDispatch(message, buffer, length);
+        if (app == 0xFC)
+            return XLiveBaseDispatch(message, buffer, length);
+        if (false)
         {
             fprintf(stderr, "[xmsg] app %02X message %08X not implemented (returning X_E_FAIL)\n", app, message);
             return X_E_FAIL;

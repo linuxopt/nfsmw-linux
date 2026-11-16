@@ -93,6 +93,7 @@ SB_PAL_ES_ADDRESS(0x82909658, 0x82909658)  // .data (same layout), same bytes; g
 SB_PAL_ES_ADDRESS(0x8290965C, 0x8290965C)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_ES_ADDRESS(0x82909730, 0x82909730)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_ES_ADDRESS(0x82909770, 0x82909770)  // .data (same layout), same bytes; game/hfr.cpp
+SB_PAL_ES_ADDRESS(0x829118D8, 0x829118D8)  // .bss (same layout), added by hand: DirtySock's xmap table pointer, beside NetConn's 0x82911768 (the same in PAL, per NFSMW Recompiled's notes); kernel/imports_net.cpp. Rerun survey/region_map.py check to confirm
 SB_PAL_ES_ADDRESS(0x82A2C480, 0x82A2C480)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_ES_ADDRESS(0x82A2C684, 0x82A2C684)  // .data (same layout), same bytes; game/quick_race_cops.h, game/split_screen.h
 SB_PAL_ES_ADDRESS(0x82A2CB6C, 0x82A2CB6C)  // .data (same layout), same bytes; game/hfr.cpp, game/hfr_diag.cpp, hid/input.cpp

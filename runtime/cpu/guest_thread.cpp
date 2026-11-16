@@ -233,3 +233,9 @@ void GuestThread::SetLastError(uint32_t error)
     // TEB + 0x160 : Win32LastError
     *(uint32_t*)(thread + TEB_OFFSET + 0x160) = ByteSwap(error);
 }
+
+uint32_t GuestThread::GetLastError()
+{
+    auto* thread = (char*)g_memory.Translate(GetPPCContext()->r13.u32);
+    return ByteSwap(*(uint32_t*)(thread + TEB_OFFSET + 0x160));
+}

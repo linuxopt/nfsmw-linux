@@ -18,6 +18,7 @@
 #include <memory>
 #include "xam.h"
 #include "xdm.h"
+#include <net/online.h>
 
 #ifdef _WIN32
 // SpeedBreaker: Windows has these NT values only in <ntstatus.h>, which
@@ -35,6 +36,13 @@ uint32_t XGetGameRegion()
 
 uint32_t XamUserGetSigninState(uint32_t userIndex)
 {
+    // 2: signed in to Xbox Live (online play through the SpeedBreaker
+    // online server, net/online.h); 1: a local profile.
+    if (userIndex == 0 && online::Enabled())
+    {
+        online::Start();  // connect now, long before the online menus want it
+        return 2;
+    }
     return true;
 }
 
@@ -67,6 +75,12 @@ uint32_t XamUserGetSigninInfo(uint32_t userIndex, uint32_t flags, XUSER_SIGNIN_I
         info->xuid = 0xB13EBABEBABEBABE;
         info->SigninState = 1;
         strcpy(info->Name, "Player");
+        if (online::Enabled())
+        {
+            info->xuid = online::PlayerXuid();
+            info->SigninState = 2;
+            snprintf(info->Name, sizeof(info->Name), "%s", online::PlayerName().c_str());
+        }
         return 0;
     }
 
