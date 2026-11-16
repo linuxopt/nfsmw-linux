@@ -10,6 +10,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QKeyEvent>
+#include <QLineEdit>
 #include <QLibraryInfo>
 #include <QLabel>
 #include <QListWidget>
@@ -330,6 +331,78 @@ int main(int argc, char** argv)
                 CHECK(text.find("language = \"english\"") != std::string::npos, "English is written:\n%s", text.c_str());
             }
         }
+    }
+
+    // Online: on or off, a name and a server (online.toml), saved on Play
+    // only when changed, refused while the name or server can't be used.
+    {
+        const fs::path online = user / "online.toml";
+        fs::remove(online);
+        settings::Load();
+        LauncherWindow w(user);
+        QString said;
+        w.messageHook = [&](const QString& m) { said = m; };
+        int plays = 0;
+        QObject::connect(&w, &LauncherWindow::playRequested, [&] { plays++; });
+        QStringList tabs = Tabs(w);
+        CHECK(tabs.indexOf("Online") >= 0 && tabs.indexOf("Online") + 1 == tabs.indexOf("Saves"),
+            "an Online tab before Saves: %s", tabs.join(",").toUtf8().constData());
+        auto* enabled = w.findChild<QCheckBox*>("online_enabled");
+        auto* name = w.findChild<QLineEdit*>("online_name");
+        auto* server = w.findChild<QLineEdit*>("online_server");
+        auto* reset = w.findChild<QPushButton*>("online_server_default");
+        auto* play = w.findChild<QPushButton*>("play");
+        CHECK(enabled && name && server && reset && play, "its fields");
+        if (enabled && name && server && reset && play)
+        {
+            CHECK(!enabled->isChecked() && name->text().isEmpty() && server->text() == "62.3.24.62:39300",
+                "off, no name, the default server");
+            CHECK(!name->isEnabled() && !server->isEnabled(), "fields greyed out while off");
+            play->click();
+            CHECK(plays == 1 && !fs::exists(online), "nothing touched: no online.toml written");
+
+            enabled->setChecked(true);
+            CHECK(name->isEnabled() && server->isEnabled(), "fields usable once on");
+            play->click();
+            CHECK(plays == 1 && said.contains("name") && !fs::exists(online), "no name: refused, said why (%s)",
+                said.toUtf8().constData());
+            CHECK(w.tabs()->tabText(w.tabs()->currentIndex()) == "Online", "and shown the Online tab");
+
+            name->setText("Racer-1");
+            server->setText("nowhere");
+            said.clear();
+            play->click();
+            CHECK(plays == 1 && said.contains("port"), "a server without a port: refused (%s)", said.toUtf8().constData());
+            reset->click();
+            CHECK(server->text() == "62.3.24.62:39300", "Default puts the server back");
+            play->click();
+            std::string text = Read(online);
+            CHECK(plays == 2 && text.find("enabled = true") != std::string::npos &&
+                      text.find("name = \"Racer-1\"") != std::string::npos &&
+                      text.find("server = \"62.3.24.62:39300\"") != std::string::npos,
+                "saved on Play:\n%s", text.c_str());
+        }
+    }
+    {
+        // As the game filled it in (an id), then turned off here: the id stays.
+        const fs::path online = user / "online.toml";
+        std::ofstream(online, std::ios::trunc) << "enabled = true\nid = '0009ABCDEF012345'\nname = 'Racer-1'\n"
+                                                  "server = 'example.org:4000'\n";
+        settings::Load();
+        LauncherWindow w(user);
+        auto* enabled = w.findChild<QCheckBox*>("online_enabled");
+        auto* server = w.findChild<QLineEdit*>("online_server");
+        CHECK(enabled && enabled->isChecked() && server && server->text() == "example.org:4000", "read back");
+        if (enabled)
+        {
+            enabled->setChecked(false);
+            w.findChild<QPushButton*>("play")->click();
+            std::string text = Read(online);
+            CHECK(text.find("enabled = false") != std::string::npos && text.find("0009ABCDEF012345") != std::string::npos &&
+                      text.find("example.org:4000") != std::string::npos,
+                "off, with the id and server kept:\n%s", text.c_str());
+        }
+        fs::remove(online);
     }
 
     if (g_failures)

@@ -188,6 +188,8 @@ target_include_directories(texpack_encode_test PRIVATE ${ROOT})
 find_package(Python3 COMPONENTS Interpreter)
 if(Python3_Interpreter_FOUND)
     add_test(NAME texpack_driver_test COMMAND ${Python3_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/texpack_driver_test.py)
+    # The online server: sign-in, the relay, and EA's lobby from login to the start line (scripts/online).
+    add_test(NAME online_server_test COMMAND ${Python3_EXECUTABLE} -B -W ignore::ResourceWarning ${CMAKE_CURRENT_SOURCE_DIR}/online_server_test.py)
 endif()
 # Shadow Resolution's Auto: 2x while the scene renders at 2x or more (gpu/shadow_auto.h), as the renderer applies it (GitHub #90).
 sb_test(shadow_auto_test SOURCES ${RT}/video/picture_fit.cpp ${RT}/video/scale_budget.cpp ARGS ${RT}/gpu/renderer.cpp ${RT}/user/settings.cpp)
@@ -367,6 +369,8 @@ if(TARGET sb_launcher_core)
     target_link_libraries(launcher_backups_test PRIVATE sb_launcher_core)
     sb_test(launcher_release_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_release_out)
     target_link_libraries(launcher_release_test PRIVATE sb_launcher_core)
+    sb_test(launcher_online_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_online_out)
+    target_link_libraries(launcher_online_test PRIVATE sb_launcher_core)
     # The AppImage's AppRun: the launcher first, the game on Play or whenever
     # the launcher can't run (a stub launcher, a stub game).
     add_executable(launcher_stub launcher_stub.cpp)

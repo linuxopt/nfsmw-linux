@@ -56,6 +56,8 @@ public:
     void message(const QString& text);
     std::function<bool(const QString&)> confirmHook;
     std::function<void(const QString&)> messageHook;
+    // `widget` shows `text` in the help line when hovered or focused.
+    void addHelp(QWidget* widget, const QString& text);
 
 signals:
     void playRequested();
@@ -73,4 +75,5 @@ private:
     QTabWidget* m_tabs = nullptr;
     QLabel* m_help = nullptr;
     QCheckBox* m_showAtStart = nullptr;
+    class OnlineTab* m_online = nullptr;
 };

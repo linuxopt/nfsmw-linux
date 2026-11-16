@@ -9,10 +9,12 @@ add_library(sb_launcher_core STATIC
     core/backups.cpp
     core/durable.cpp
     core/release.cpp
+    core/online.cpp
     ${CMAKE_SOURCE_DIR}/runtime/install/manifest.cpp
 )
 target_include_directories(sb_launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core ${CMAKE_SOURCE_DIR}/runtime)
 target_compile_features(sb_launcher_core PUBLIC cxx_std_20)
+target_include_directories(sb_launcher_core SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/tools/XenonRecomp/thirdparty/tomlplusplus/include)
 # The releases the game itself knows (install/manifest.cpp): PAL DE only in a
 # build that links the German code (recomp/CMakeLists.txt).
 if(SB_HAVE_PAL_ES)
@@ -32,6 +34,7 @@ if(SB_LAUNCHER)
         app/option_row.cpp
         app/controls_tab.cpp
         app/saves_tab.cpp
+        app/online_tab.cpp
         app/theme.cpp
         ${RT}/user/settings.cpp
         ${RT}/user/paths.cpp

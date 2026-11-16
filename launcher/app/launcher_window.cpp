@@ -4,6 +4,7 @@
 #include "controls_tab.h"
 #include "option_row.h"
 #include "saves_tab.h"
+#include "online_tab.h"
 
 #include <QCheckBox>
 #include <QCloseEvent>
@@ -76,6 +77,8 @@ LauncherWindow::LauncherWindow(std::filesystem::path userDir, QWidget* parent) :
         if (page)
             m_tabs->addTab(page, QString::fromUtf8(settings::CategoryName(category)));
     }
+    m_online = new OnlineTab(this);
+    m_tabs->addTab(m_online, "Online");
     m_tabs->addTab(new SavesTab(this), "Saves");
     layout->addWidget(m_tabs, 1);
     connect(m_tabs, &QTabWidget::currentChanged, this, [this] { describe({}); });
@@ -223,11 +226,24 @@ bool LauncherWindow::saveIfChanged()
     return true;
 }
 
+void LauncherWindow::addHelp(QWidget* widget, const QString& text)
+{
+    widget->setProperty(kDescription, text);
+    widget->installEventFilter(this);
+}
+
 void LauncherWindow::play()
 {
     if (!saveIfChanged())
     {
         message(QString::fromStdString(settings::LastError()));
+        return;
+    }
+    QString error;
+    if (!m_online->save(error))
+    {
+        m_tabs->setCurrentWidget(m_online);
+        message(error);
         return;
     }
     emit playRequested();
@@ -238,6 +254,13 @@ void LauncherWindow::closeEvent(QCloseEvent* event)
     if (!saveIfChanged())
     {
         message(QString::fromStdString(settings::LastError()));
+        event->ignore();
+        return;
+    }
+    QString error;
+    if (!m_online->save(error) && !confirm(error + "\n\nClose without saving the online settings?"))
+    {
+        m_tabs->setCurrentWidget(m_online);
         event->ignore();
         return;
     }
