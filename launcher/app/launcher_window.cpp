@@ -8,12 +8,15 @@
 
 #include <QCheckBox>
 #include <QCloseEvent>
+#include <QApplication>
 #include <QCoreApplication>
 #include <QEvent>
+#include <QFile>
 #include <QGridLayout>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QIcon>
+#include <QPixmap>
 #include <QLabel>
 #include <QMessageBox>
 #include <QPushButton>
@@ -27,7 +30,9 @@
 #include <cstdlib>
 #include <format>
 
+#include <app_menu.h>
 #include <release.h>
+#include <install/title_icon.h>
 #include <rules.h>
 
 void launcher::ApplyReleaseDefaults(const std::filesystem::path& userDir)
@@ -57,7 +62,16 @@ namespace
 LauncherWindow::LauncherWindow(std::filesystem::path userDir, QWidget* parent) : QWidget(parent), m_userDir(std::move(userDir))
 {
     setWindowTitle("SpeedBreaker");
-    setWindowIcon(QIcon(":/AppIcon.png"));
+    // The game's own icon (its dashboard art, from the player's default.xex),
+    // else SpeedBreaker's; for the dialogs too.
+    if (std::optional<std::filesystem::path> game = launcher::release::InstalledGameDir(m_userDir, std::getenv("NFSMW_GAME_DIR")))
+        m_titleIcon = install::TitleIconFromXex(*game / "default.xex");
+    QPixmap titleIcon;
+    if (!m_titleIcon.empty())
+        titleIcon.loadFromData(m_titleIcon.data(), uint(m_titleIcon.size()), "PNG");
+    const QIcon icon = titleIcon.isNull() ? QIcon(":/AppIcon.png") : QIcon(titleIcon);
+    setWindowIcon(icon);
+    QApplication::setWindowIcon(icon);
     setMinimumSize(760, 520);
 
     auto* layout = new QVBoxLayout(this);
@@ -101,6 +115,25 @@ LauncherWindow::LauncherWindow(std::filesystem::path userDir, QWidget* parent) :
     connect(m_showAtStart, &QCheckBox::toggled, this, [](bool on) { settings::Set(settings::Id::LauncherShowAtStart, on ? 1.0 : 0.0); });
     bar->addWidget(m_showAtStart);
     bar->addStretch(1);
+    // In an AppImage: an entry for it in the desktop's app menu, kept
+    // pointing at this AppImage when it has moved or been updated.
+    if (const char* appImage = std::getenv("APPIMAGE"); appImage && appImage[0] == '/')
+        if (std::optional<std::filesystem::path> data = launcher::app_menu::DataHome(std::getenv("XDG_DATA_HOME"), std::getenv("HOME")))
+        {
+            m_appImage = appImage;
+            m_menuPaths = launcher::app_menu::PathsIn(*data);
+            m_appMenu = new QPushButton(this);
+            m_appMenu->setObjectName("app_menu");
+            addHelp(m_appMenu, "Puts Need for Speed: Most Wanted in your desktop's app menu, with the game's own icon, "
+                               "so it starts from there like any other game. Remove takes it out again.");
+            connect(m_appMenu, &QPushButton::clicked, this, &LauncherWindow::toggleAppMenu);
+            bar->addWidget(m_appMenu);
+            std::string error;
+            if (launcher::app_menu::Check(m_menuPaths) == launcher::app_menu::State::Ours &&
+                !launcher::app_menu::Write(m_menuPaths, m_appImage, menuIcon(), error))
+                fprintf(stderr, "[launcher] the app-menu entry: %s\n", error.c_str());
+            showAppMenuState();
+        }
     auto* playButton = new QPushButton("Play", this);
     playButton->setObjectName("play");
     playButton->setDefault(true);
@@ -181,6 +214,42 @@ QWidget* LauncherWindow::categoryPage(settings::Category category)
     return scroll;
 }
 
+std::vector<uint8_t> LauncherWindow::menuIcon() const
+{
+    if (!m_titleIcon.empty())
+        return m_titleIcon;
+    QFile f(":/AppIcon.png");
+    if (!f.open(QIODevice::ReadOnly))
+        return {};
+    const QByteArray bytes = f.readAll();
+    return std::vector<uint8_t>(bytes.begin(), bytes.end());
+}
+
+void LauncherWindow::showAppMenuState()
+{
+    if (!m_appMenu)
+        return;
+    m_appMenu->setText(launcher::app_menu::Check(m_menuPaths) == launcher::app_menu::State::Ours ? "Remove from App Menu" : "Add to App Menu");
+}
+
+void LauncherWindow::toggleAppMenu()
+{
+    std::string error;
+    if (launcher::app_menu::Check(m_menuPaths) == launcher::app_menu::State::Ours)
+    {
+        if (launcher::app_menu::Remove(m_menuPaths, error))
+            inform("Need for Speed: Most Wanted is out of the app menu.");
+        else
+            message(QString::fromStdString("Couldn't remove it from the app menu: " + error));
+    }
+    else if (launcher::app_menu::Write(m_menuPaths, m_appImage, menuIcon(), error))
+        inform("Need for Speed: Most Wanted is in the app menu now (Games). If this AppImage moves, open the launcher "
+                "once from its new place and the entry follows it.");
+    else
+        message(QString::fromStdString("Couldn't add it to the app menu: " + error));
+    showAppMenuState();
+}
+
 void LauncherWindow::describe(const QString& text)
 {
     if (m_help)
@@ -201,6 +270,14 @@ void LauncherWindow::message(const QString& text)
         messageHook(text);
     else
         QMessageBox::warning(this, "SpeedBreaker", text);
+}
+
+void LauncherWindow::inform(const QString& text)
+{
+    if (messageHook)
+        messageHook(text);
+    else
+        QMessageBox::information(this, "SpeedBreaker", text);
 }
 
 bool LauncherWindow::eventFilter(QObject* watched, QEvent* event)

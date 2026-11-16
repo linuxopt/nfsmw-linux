@@ -11,10 +11,14 @@
 
 #include <filesystem>
 #include <functional>
+#include <string>
+#include <vector>
 
 #include <user/settings.h>
+#include <app_menu.h>
 
 class QCheckBox;
+class QPushButton;
 class QLabel;
 class QTabWidget;
 
@@ -54,6 +58,7 @@ public:
     // tests answer them; no dialog opens).
     bool confirm(const QString& question);
     void message(const QString& text);
+    void inform(const QString& text);  // news, not a warning (the same hook)
     std::function<bool(const QString&)> confirmHook;
     std::function<void(const QString&)> messageHook;
     // `widget` shows `text` in the help line when hovered or focused.
@@ -70,10 +75,18 @@ private:
     bool shown(const settings::Option& o) const;
     QWidget* categoryPage(settings::Category category);
     void play();
+    // Add to App Menu (launcher/core/app_menu.h): its label for the entry's state, and the click.
+    void showAppMenuState();
+    void toggleAppMenu();
+    std::vector<uint8_t> menuIcon() const;  // the game's icon, else SpeedBreaker's
 
     std::filesystem::path m_userDir;
     QTabWidget* m_tabs = nullptr;
     QLabel* m_help = nullptr;
     QCheckBox* m_showAtStart = nullptr;
     class OnlineTab* m_online = nullptr;
+    QPushButton* m_appMenu = nullptr;
+    std::string m_appImage;               // $APPIMAGE: the AppImage this runs from ("" outside one)
+    launcher::app_menu::Paths m_menuPaths; // where its entry goes (with m_appMenu)
+    std::vector<uint8_t> m_titleIcon;     // the game's own icon (a PNG), or empty
 };

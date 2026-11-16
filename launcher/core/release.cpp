@@ -38,17 +38,21 @@ namespace launcher::release
         }
     }
 
+    std::optional<fs::path> InstalledGameDir(const fs::path& userDir, const char* gameDirEnv)
+    {
+        if (gameDirEnv && *gameDirEnv && At(gameDirEnv))
+            return fs::path(gameDirEnv);
+        if (std::optional<fs::path> recorded = Recorded(userDir); recorded && At(*recorded))
+            return recorded;
+        if (At(userDir / "game"))
+            return userDir / "game";
+        return std::nullopt;
+    }
+
     std::string_view InstalledRegion(const fs::path& userDir, const char* gameDirEnv)
     {
-        if (gameDirEnv && *gameDirEnv)
-            if (const install::Manifest* m = At(gameDirEnv))
-                return m->region;
-        if (std::optional<fs::path> recorded = Recorded(userDir))
-            if (const install::Manifest* m = At(*recorded))
-                return m->region;
-        if (const install::Manifest* m = At(userDir / "game"))
-            return m->region;
-        return {};
+        const std::optional<fs::path> dir = InstalledGameDir(userDir, gameDirEnv);
+        return dir ? At(*dir)->region : std::string_view();
     }
 
     int32_t DiscLanguageDefault(const fs::path& userDir, const char* gameDirEnv)

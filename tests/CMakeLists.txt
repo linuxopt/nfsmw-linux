@@ -375,6 +375,8 @@ if(TARGET sb_launcher_core)
     target_link_libraries(launcher_release_test PRIVATE sb_launcher_core)
     sb_test(launcher_online_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_online_out)
     target_link_libraries(launcher_online_test PRIVATE sb_launcher_core)
+    sb_test(launcher_app_menu_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_app_menu_out)
+    target_link_libraries(launcher_app_menu_test PRIVATE sb_launcher_core)
     # The AppImage's AppRun: the launcher first, the game on Play or whenever
     # the launcher can't run (a stub launcher, a stub game).
     add_executable(launcher_stub launcher_stub.cpp)
@@ -383,7 +385,7 @@ if(TARGET sb_launcher_core)
 endif()
 # The launcher's window, offscreen (SB_LAUNCHER: Qt 6).
 if(TARGET sb_launcher_app)
-    sb_test(launcher_app_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_app_out)
+    sb_test(launcher_app_test ARGS ${CMAKE_CURRENT_BINARY_DIR}/launcher_app_out ${CMAKE_SOURCE_DIR}/game/files)
     target_link_libraries(launcher_app_test PRIVATE sb_launcher_app)
 endif()
 # The desktop launcher's save (settings::SaveTouched): only the file's options

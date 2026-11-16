@@ -49,6 +49,7 @@ int main(int argc, char** argv)
     fs::create_directories(user);
 
     CHECK(release::InstalledRegion(user, nullptr).empty(), "nothing installed");
+    CHECK(!release::InstalledGameDir(user, nullptr), "no folder");
     CHECK(release::DiscLanguageDefault(user, nullptr) < 0, "no default");
 
     for (const install::Manifest* m : install::GameManifests())
@@ -69,6 +70,7 @@ int main(int argc, char** argv)
     Xex(scratch / "sdcard" / "nfs", "usa");
     std::ofstream(user / "game-location") << (scratch / "sdcard" / "nfs").string() << "/\n";
     CHECK(release::InstalledRegion(user, nullptr) == "usa", "the recorded folder");
+    CHECK(release::InstalledGameDir(user, nullptr) == scratch / "sdcard" / "nfs", "the recorded folder, without its slash");
     Xex(scratch / "envdir", "pal-es");
     CHECK(release::InstalledRegion(user, (scratch / "envdir").c_str()) == "pal-es", "NFSMW_GAME_DIR");
     // A folder without a known default.xex is passed over.
@@ -76,6 +78,8 @@ int main(int argc, char** argv)
     CHECK(release::InstalledRegion(user, (scratch / "empty").c_str()) == "usa", "an unusable NFSMW_GAME_DIR is skipped");
     std::ofstream(scratch / "sdcard" / "nfs" / "default.xex", std::ios::trunc) << "x";
     CHECK(release::InstalledRegion(user, nullptr) == "pal-es", "an unknown default.xex is skipped");
+    CHECK(release::InstalledGameDir(user, nullptr) == user / "game", "then the data folder's game/");
+    CHECK(release::InstalledGameDir(user, (scratch / "envdir").c_str()) == scratch / "envdir", "NFSMW_GAME_DIR first");
 
     if (g_failures)
         printf("launcher_release_test: %d failure(s)\n", g_failures);

@@ -10,10 +10,14 @@ add_library(sb_launcher_core STATIC
     core/durable.cpp
     core/release.cpp
     core/online.cpp
+    core/app_menu.cpp
     ${CMAKE_SOURCE_DIR}/runtime/install/manifest.cpp
+    ${CMAKE_SOURCE_DIR}/runtime/install/title_icon.cpp
 )
 target_include_directories(sb_launcher_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/core ${CMAKE_SOURCE_DIR}/runtime)
 target_compile_features(sb_launcher_core PUBLIC cxx_std_20)
+# The game's own icon (install/title_icon.h) needs default.xex loaded.
+target_link_libraries(sb_launcher_core PUBLIC XenonUtilsLite)
 target_include_directories(sb_launcher_core SYSTEM PRIVATE ${CMAKE_SOURCE_DIR}/tools/XenonRecomp/thirdparty/tomlplusplus/include)
 # The releases the game itself knows (install/manifest.cpp): PAL DE only in a
 # build that links the German code (recomp/CMakeLists.txt).

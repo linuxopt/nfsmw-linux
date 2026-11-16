@@ -2,7 +2,8 @@
 // settings category from the game's own option table, the rows the game's
 // menu would show, and a save that writes only what was changed (and the
 // version, for a settings.toml the launcher creates).
-// Argument: a scratch folder (its data folder is set through XDG_DATA_HOME).
+// Arguments: a scratch folder (its data folder is set through XDG_DATA_HOME),
+// and optionally the game's folder (game/files), for its own icon.
 #include <launcher_window.h>
 #include <theme.h>
 
@@ -403,6 +404,87 @@ int main(int argc, char** argv)
                 "off, with the id and server kept:\n%s", text.c_str());
         }
         fs::remove(online);
+    }
+
+    // The window's icon: the game's own (install/title_icon.h) when its
+    // default.xex is there, else SpeedBreaker's.
+    {
+        settings::Load();
+        LauncherWindow w(user);
+        CHECK(!w.windowIcon().isNull() && !QApplication::windowIcon().isNull(), "an icon without the game");
+        const fs::path game = argc > 2 ? fs::absolute(argv[2]) : fs::path();
+        if (!game.empty() && fs::exists(game / "default.xex"))
+        {
+            setenv("NFSMW_GAME_DIR", game.c_str(), 1);
+            LauncherWindow withGame(user);
+            const QList<QSize> sizes = withGame.windowIcon().availableSizes();
+            CHECK(sizes.size() == 1 && sizes[0] == QSize(64, 64), "the game's 64x64 icon (%d sizes)", int(sizes.size()));
+            CHECK(QApplication::windowIcon().availableSizes() == sizes, "for the dialogs too");
+            unsetenv("NFSMW_GAME_DIR");
+        }
+        else
+            printf("launcher_app_test: no game in %s, the game's icon not checked\n", game.c_str());
+    }
+
+    // Add to App Menu: only in an AppImage (APPIMAGE), an entry that runs it.
+    {
+        const fs::path entry = scratch / "data" / "applications" / "speedbreaker.desktop";
+        const fs::path icon = scratch / "data" / "icons" / "speedbreaker-nfsmw.png";
+        unsetenv("APPIMAGE");
+        settings::Load();
+        {
+            LauncherWindow w(user);
+            auto* menu = w.findChild<QPushButton*>("app_menu");
+            CHECK(!menu || menu->isHidden(), "not outside an AppImage");
+        }
+        setenv("APPIMAGE", "/apps/SpeedBreaker-0.2.5-x86_64.AppImage", 1);
+        {
+            LauncherWindow w(user);
+            QString said;
+            w.messageHook = [&](const QString& m) { said = m; };
+            auto* menu = w.findChild<QPushButton*>("app_menu");
+            CHECK(menu && !menu->isHidden() && menu->text() == "Add to App Menu", "offered");
+            CHECK(!fs::exists(entry), "nothing written by opening the window");
+            if (menu)
+            {
+                menu->click();
+                const std::string text = Read(entry);
+                CHECK(text.find("\nExec=\"/apps/SpeedBreaker-0.2.5-x86_64.AppImage\"\n") != std::string::npos &&
+                          text.find("\nIcon=" + icon.string() + "\n") != std::string::npos,
+                    "added:\n%s", text.c_str());
+                CHECK(Read(icon).rfind("\x89PNG", 0) == 0, "with its icon");
+                CHECK(menu->text() == "Remove from App Menu" && said.contains("app menu"), "said so (%s)", qPrintable(said));
+            }
+        }
+        // A moved or updated AppImage: the entry follows it when the launcher opens.
+        setenv("APPIMAGE", "/apps/SpeedBreaker-0.2.6-x86_64.AppImage", 1);
+        {
+            LauncherWindow w(user);
+            CHECK(Read(entry).find("\nExec=\"/apps/SpeedBreaker-0.2.6-x86_64.AppImage\"\n") != std::string::npos,
+                "follows the AppImage");
+            w.messageHook = [](const QString&) {};
+            auto* menu = w.findChild<QPushButton*>("app_menu");
+            if (menu)
+            {
+                menu->click();
+                CHECK(!fs::exists(entry) && !fs::exists(icon) && menu->text() == "Add to App Menu", "removed");
+            }
+        }
+        // Someone else's speedbreaker.desktop: left alone, and said why.
+        fixture::WriteBytes(entry, "[Desktop Entry]\nType=Application\nName=Mine\nExec=mine\n");
+        {
+            LauncherWindow w(user);
+            QString said;
+            w.messageHook = [&](const QString& m) { said = m; };
+            auto* menu = w.findChild<QPushButton*>("app_menu");
+            if (menu)
+            {
+                menu->click();
+                CHECK(Read(entry).find("Name=Mine") != std::string::npos && !said.isEmpty(), "left alone (%s)", qPrintable(said));
+            }
+        }
+        fs::remove(entry);
+        unsetenv("APPIMAGE");
     }
 
     if (g_failures)
