@@ -70,6 +70,8 @@ Steam Deck in Desktop Mode.
   tuned to its hardware, and loads in-game with no frame-rate cost on the test machine.
 - **HD Textures setting** (Settings > Graphics): Auto, 1K, 2K or Off, shown once a pack is
   installed. Auto picks by GPU memory and switches the pack off where it would hurt.
+- **The game's own icon** for the game window, the launcher and an app-menu entry, read from your
+  copy of the game, and **Add to App Menu** in the launcher.
 - **Online races**: the game's own Xbox Live menus (Quick Match: create a race or join one) work
   again, through a SpeedBreaker online server that stands in for Xbox Live and EA's lobby and
   relays the race between players, so nobody needs to open a port. See [Online races](#online-races).
@@ -91,6 +93,13 @@ Steam Deck in Desktop Mode.
   A name or server that can't be used stops **Play** with a message saying why.
 - **Open this launcher at start**: untick it to go straight to the game next time;
   `--launcher` brings the window back.
+- **Add to App Menu**: puts *Need for Speed: Most Wanted* in your desktop's app menu (Games),
+  starting the AppImage; **Remove from App Menu** takes it out. If the AppImage moves or is
+  updated, opening the launcher once from its new place points the entry at it.
+- **The game's own icon**: the launcher window, the game window and the app-menu entry use the
+  dashboard icon from your copy's `default.xex` (the 64x64 art the Xbox 360 dashboard showed for
+  the game). SpeedBreaker ships no game art, so before the game is installed they show
+  SpeedBreaker's own icon.
 - **It never gets in the way of playing**: in SteamOS Game Mode, or with no display, the game starts
   without it, and if the launcher can't run on a machine (a missing library, a crash), the game
   starts anyway.
