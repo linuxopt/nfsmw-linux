@@ -9,7 +9,7 @@
 # AppImage, see --appimage-offset). Needs mksquashfs (squashfs-tools).
 #
 # The AppImage holds exactly the bundle (launcher, lib/, licenses) plus
-# AppRun, a .desktop file and the icon. Never any game data: the first run's
+# AppRun, a .desktop file, the icon and recomplauncher.json. Never any game data: the first run's
 # installer takes the player's own disc image, into ~/.local/share/speedbreaker.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)"
@@ -51,6 +51,12 @@ StartupWMClass=SpeedBreaker
 X-AppImage-Version=$VERSION
 EOF
 cp "$APPDIR/speedbreaker.desktop" "$APPDIR/usr/share/applications/"
+
+# RecompLauncher (recomplauncher.com) reads /recomplauncher.json from the
+# AppImage itself: Easy Setup from the player's disc, the settings on the
+# game's page, where the saves are (recomplauncher.json at the repo's top).
+[ -f "$ROOT/recomplauncher.json" ] || { echo "make_appimage.sh: no recomplauncher.json in $ROOT" >&2; exit 1; }
+cp "$ROOT/recomplauncher.json" "$APPDIR/recomplauncher.json"
 
 # The texture pack tools (texpack/, scripts/texpack/setup_tools.sh): the extractor,
 # encoder and GPU probe from the build, Real-ESRGAN-ncnn-vulkan from tools/, and

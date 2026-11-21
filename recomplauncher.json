@@ -1,0 +1,119 @@
+{
+  "$schema": "https://recomplauncher.com/schema/recomplauncher.json",
+  "format": 1,
+  "name": "SpeedBreaker (Need for Speed: Most Wanted)",
+  "repo": "linuxopt/nfsmw-linux",
+  "game": {
+    "kind": "iso_or_folder",
+    "label": "Your copy of Need for Speed: Most Wanted (2005) for Xbox 360, the USA release (EA-2009): its disc image (.iso), or a folder with its files and default.xex. No title update is needed.",
+    "check": { "file": "default.xex", "xdvdfs": "default.xex" },
+    "dumps": [
+      { "name": "USA", "size": 7834892288, "crc32": "84c025cf" }
+    ]
+  },
+  "prepare": {
+    "program": ["SpeedBreaker-x86_64.AppImage"],
+    "args": ["--install", "{game}"],
+    "label": "Copying your disc's files and checking each one (7.1 GB)",
+    "timeout": 3600,
+    "done": ["{data}/data/game/default.xex"]
+  },
+  "start": {
+    "program": ["SpeedBreaker-x86_64.AppImage"],
+    "args": ["--play"],
+    "env": { "NFSMW_UPDATE_CHECK": "0" }
+  },
+  "config": [
+    {
+      "id": "main",
+      "format": "toml",
+      "file": [{ "path": "{data}/data/settings.toml" }]
+    }
+  ],
+  "settings": [
+    {
+      "id": "window", "label": "Window", "group": "Display",
+      "help": "Full screen, or a window you can resize.",
+      "choices": [
+        { "label": "Windowed", "set": { "video/fullscreen": "false" } },
+        { "label": "Full screen", "set": { "video/fullscreen": "true" } }
+      ],
+      "defaults": { "video/fullscreen": "false" }
+    },
+    {
+      "id": "vsync", "label": "V-Sync", "group": "Display",
+      "help": "Waits for the screen's refresh: no tearing. Off shows each frame as soon as it's ready.",
+      "choices": [
+        { "label": "On", "set": { "video/vsync": "true" } },
+        { "label": "Off", "set": { "video/vsync": "false" } }
+      ],
+      "defaults": { "video/vsync": "true" }
+    },
+    {
+      "id": "frame_rate", "label": "Frame Rate", "group": "Display",
+      "help": "60 is the game's own. Auto drops to 30 while the PC is too hot or too slow to hold 60.",
+      "choices": [
+        { "label": "60 fps", "set": { "video/frame_rate": "\"60\"" } },
+        { "label": "Auto", "set": { "video/frame_rate": "\"auto\"" } },
+        { "label": "30 fps", "set": { "video/frame_rate": "\"30\"" } }
+      ],
+      "defaults": { "video/frame_rate": "\"60\"" }
+    },
+    {
+      "id": "resolution", "label": "Internal Resolution", "group": "Graphics",
+      "help": "What the 3D scene draws at. 1x is the console's 720p. Auto picks it from your screen (2x on a 1440p one).",
+      "choices": [
+        { "label": "Auto", "set": { "video/internal_resolution": "\"auto\"" } },
+        { "label": "1x (720p)", "set": { "video/internal_resolution": "\"1x\"" } },
+        { "label": "1.5x (1080p)", "set": { "video/internal_resolution": "\"1.5x\"" } },
+        { "label": "2x (1440p)", "set": { "video/internal_resolution": "\"2x\"" } },
+        { "label": "3x (2160p)", "set": { "video/internal_resolution": "\"3x\"" } }
+      ],
+      "defaults": { "video/internal_resolution": "\"auto\"" }
+    },
+    {
+      "id": "anti_aliasing", "label": "Anti-Aliasing", "group": "Graphics",
+      "help": "Smooths jagged edges. Above 1x Internal Resolution the edges are smooth already, and off keeps the picture a little sharper.",
+      "choices": [
+        { "label": "On", "set": { "video/anti_aliasing": "true" } },
+        { "label": "Off", "set": { "video/anti_aliasing": "false" } }
+      ],
+      "defaults": { "video/anti_aliasing": "true" }
+    },
+    {
+      "id": "haze", "label": "Haze", "group": "Graphics",
+      "help": "The game's grey veil over dark areas. 100% is its own look; lower is clearer and deeper.",
+      "slider": { "key": "video/haze", "min": 0, "max": 100, "step": 10, "format": "%d" },
+      "defaults": { "video/haze": "100" }
+    },
+    {
+      "id": "unlock_everything", "label": "Unlock Everything", "group": "Game",
+      "help": "Every car, part, track and event from the start, in Quick Race and the career. Not saved in your profile: Off puts it back.",
+      "choices": [
+        { "label": "Off", "set": { "game/unlock_everything": "false" } },
+        { "label": "On", "set": { "game/unlock_everything": "true" } }
+      ],
+      "defaults": { "game/unlock_everything": "false" }
+    },
+    {
+      "id": "game_speed", "label": "Game Speed", "group": "Game", "advanced": true,
+      "help": "How fast the world runs in races. Below 100% is slow motion, a little less smooth.",
+      "slider": { "key": "game/game_speed", "min": 25, "max": 200, "step": 25, "format": "%d" },
+      "defaults": { "game/game_speed": "100" }
+    }
+  ],
+  "saves": ["{data}/data/save", "{data}/data/settings.toml"],
+  "folders": {
+    "saves": [{ "path": "{data}/data/save" }],
+    "logs": [{ "path": "{data}/data/logs" }],
+    "data": [{ "path": "{data}" }]
+  },
+  "actions": [
+    { "id": "saves", "label": "Saves", "help": "Your career and Quick Race profiles.", "open": "saves" },
+    { "id": "logs", "label": "Logs", "help": "The last runs' logs, and crash reports.", "open": "logs" },
+    { "id": "cache", "label": "Shader cache", "help": "Shaders the game has built, so they don't stutter again. Clearing only helps if graphics look wrong after an update.", "clear": "data/cache" }
+  ],
+  "system": {
+    "linux": { "graphics": { "vulkan": "1.2" } }
+  }
+}
