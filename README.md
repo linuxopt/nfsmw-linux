@@ -31,13 +31,13 @@ in it still applies, and this section describes only what this fork adds.
 
 ## Download and run
 
-1. Download `SpeedBreaker-0.2.5-x86_64.AppImage` from this repository's
+1. Download `SpeedBreaker-0.2.6-x86_64.AppImage` from this repository's
    [Releases](../../releases) page. Its `.sha256` file is there too:
-   `sha256sum -c SpeedBreaker-0.2.5-x86_64.AppImage.sha256`
+   `sha256sum -c SpeedBreaker-0.2.6-x86_64.AppImage.sha256`
 2. Make it executable and run it:
    ```bash
-   chmod +x SpeedBreaker-0.2.5-x86_64.AppImage
-   ./SpeedBreaker-0.2.5-x86_64.AppImage
+   chmod +x SpeedBreaker-0.2.6-x86_64.AppImage
+   ./SpeedBreaker-0.2.6-x86_64.AppImage
    ```
 3. The launcher opens. Change whatever you like, then press **Play**. On the first run the game's
    installer asks for your disc image (see [Quick start](#quick-start) below).
@@ -114,7 +114,7 @@ Steam Deck in Desktop Mode.
 ## AI HD texture pack
 
 ```bash
-./SpeedBreaker-0.2.5-x86_64.AppImage --texpack build
+./SpeedBreaker-0.2.6-x86_64.AppImage --texpack build
 ```
 
 What it does, on your machine only:
