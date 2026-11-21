@@ -5,13 +5,10 @@
 // left/right changes it, A toggles, LB/RB turn pages, B closes. The mouse
 // works too (a click selects a row, its arrows change it, the tabs turn
 // pages), and touch as the mouse (on iOS a drag scrolls the rows: ui.cpp).
-// Advanced also has Save Bug Report (report/bug_report.cpp), Check for
-// Updates (update_dialog.cpp) with Check for Updates at Startup under it,
-// the build's identity (version and commit) and the legal notice. The
-// footer's last button is Quit Game, which asks first (quit_game.h; not on
-// iPhone or iPad); while a check (at startup or pressed) has found a newer
-// version, its first is "Update to v0.2.5", on every page, which opens the
-// update dialog with it.
+// Advanced also has Save Bug Report (report/bug_report.cpp), the build's
+// identity (version and commit) and the legal notice. The footer's last
+// button is Quit Game, which asks first (quit_game.h; not on iPhone or
+// iPad).
 #include <stdafx.h>
 #include "ui.h"
 #include "quit_game.h"
@@ -657,12 +654,6 @@ namespace ui
                 report::SaveBugReport();
         }
 
-        // A (or a click) asks GitHub, and the dialog shows the answer.
-        void UpdateRow(float valueWidth)
-        {
-            if (ActionRow("check-updates", "Check for Updates", UpdateRowValue(), valueWidth, s_describedUpdate))
-                OpenUpdateDialog();
-        }
 
         bool QuitPromptOpen()
         {
@@ -1087,7 +1078,7 @@ namespace ui
                             if (o.category == category && Shown(o))
                                 valueWidth = std::max(valueWidth, ValueWidth(o));
                     if (category == Category::Advanced)
-                        for (const char* text : { "Saving...", "Checking...", "Couldn't check (offline)", UpdateRowValue() })
+                        for (const char* text : { "Saving..." })
                             valueWidth = std::max(valueWidth, ImGui::CalcTextSize(text).x);
                     if (category == Category::Game)
                     {
@@ -1125,13 +1116,10 @@ namespace ui
                             MovieRow(valueWidth);
                             DebugCarRow(valueWidth);
                         }
+                        // nfsmw-linux: no Check for Updates (update/updater.cpp): the
+                        // fork's releases are its own, not upstream's.
                         if (category == Category::Advanced)
-                        {
                             BugReportRow(valueWidth);
-                            UpdateRow(valueWidth);
-                            // The startup check's switch, under the button it adds to.
-                            OptionRow(settings::Info(Id::UpdateCheck), valueWidth, false);
-                        }
                         ImGui::EndTable();
                     }
                     ImGui::PopStyleVar();
@@ -1172,17 +1160,6 @@ namespace ui
         for (const auto& o : settings::Options())
             if (o.category == s_category && (Shown(o) || (o.hidden && hiddenCounts)) && !settings::IsDefault(o.id))
                 anyChanged = true;
-        // A newer version (update/updater.h): first, so Down from the rows
-        // lands on it.
-        if (const std::string update = update::FooterLabel(); !update.empty())
-        {
-            PushAccentText();
-            const bool pressed = ImGui::Button(update.c_str());
-            PopAccentText();
-            if (pressed)
-                ShowUpdateDialog();
-            ImGui::SameLine();
-        }
         ImGui::BeginDisabled(!anyChanged);
         if (ImGui::Button("Reset page"))
             ImGui::OpenPopup("reset");

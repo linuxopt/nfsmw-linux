@@ -567,10 +567,14 @@ namespace settings
               .table = "advanced", .key = "performance_overlay", .label = "Performance Overlay",
               .description = "Show the frame rate and frame time in a corner of the screen.",
               .env = "NFSMW_PERF_OVERLAY", .defaultValue = 0 },
-            { .id = Id::UpdateCheck, .category = Category::Advanced, .type = Type::Bool, .apply = Apply::Live,
+            // nfsmw-linux: hidden and off. The fork's releases come from its own
+            // repository (and through RecompLauncher), not upstream's, which
+            // the check asks; update/updater.cpp doesn't run it (a saved
+            // `true` stays in the file and is ignored).
+            { .id = Id::UpdateCheck, .category = Category::Advanced, .type = Type::Bool, .apply = Apply::Live, .hidden = true,
               .table = "advanced", .key = "check_for_updates_at_startup", .label = "Check for Updates at Startup",
               .description = "Ask GitHub once at each launch whether a newer SpeedBreaker is out. Only the question goes out: nothing about you or this device. Off: only Check for Updates asks.",
-              .env = "NFSMW_UPDATE_CHECK", .defaultValue = 1 },
+              .env = "NFSMW_UPDATE_CHECK", .defaultValue = 0 },
             // Game
             { .id = Id::GameLanguage, .category = Category::Game, .type = Type::Enum, .apply = Apply::Restart, .hidden = kLanguageHidden,
               .table = "game", .key = "language", .label = "Language",

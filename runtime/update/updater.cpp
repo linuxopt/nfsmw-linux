@@ -389,7 +389,16 @@ namespace update
             const char* feedVar = std::getenv("NFSMW_UPDATE_FEED");
             const char* urlVar = std::getenv("NFSMW_UPDATE_URL");
             const bool feed = (feedVar && *feedVar) || (urlVar && *urlVar);  // (an unusable feed fails: never GitHub)
-            if (s_afterUpdate)
+            if (!asked && !feed)
+            {
+                // nfsmw-linux: no update check. The menus have no Check for
+                // Updates, and upstream's releases (what it asks) aren't
+                // this fork's. NFSMW_UPDATE_CHECK=1 or a test feed still runs
+                // it, for the tests.
+                fprintf(stderr, "[update] startup check: off in this build (nfsmw-linux; NFSMW_UPDATE_CHECK=1 checks)\n");
+                s_startupSettled = true;
+            }
+            else if (s_afterUpdate)
             {
                 fprintf(stderr, "[update] startup check: skipped (the game just restarted after an update)\n");
                 s_startupSettled = true;
