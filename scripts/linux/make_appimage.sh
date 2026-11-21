@@ -163,4 +163,8 @@ rm -f "$SQ"
 chmod 755 "$IMG.partial"
 mv "$IMG.partial" "$IMG"
 (cd "$OUT" && sha256sum "$(basename "$IMG")" > "$(basename "$IMG").sha256")
-echo "$(du -h "$IMG" | cut -f1) $IMG"
+# The same recomplauncher.json beside it, to attach to the release too:
+# RecompLauncher's catalog and checks look for it among a release's files
+# (the launcher itself reads the copy inside the AppImage).
+cp "$ROOT/recomplauncher.json" "$OUT/recomplauncher.json"
+echo "$(du -h "$IMG" | cut -f1) $IMG (attach it, its .sha256 and recomplauncher.json to the release)"
