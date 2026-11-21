@@ -3,6 +3,8 @@
 **SpeedBreaker for Linux as one AppImage, with a desktop launcher, an AI HD texture pack and
 online races.**
 
+<a href="https://recomplauncher.com"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
+
 This is an unofficial fork of [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker)
 v0.2.5, the static recompilation of the Xbox 360 version of *Need for Speed: Most Wanted*
 (2005). It is not made by, or affiliated with, the SpeedBreaker project, Electronic Arts or
@@ -179,6 +181,12 @@ game adds to tell you apart: keep it), which can also be edited by hand.
 | Installed game | `~/.local/share/speedbreaker/game/` (unless you chose another folder) |
 | Online name and server | `~/.local/share/speedbreaker/online.toml` |
 | Logs | `~/.local/share/speedbreaker/last-run.log` |
+
+Installed through [RecompLauncher](https://recomplauncher.com), all of it is in the game's own
+folder instead, in `recompdata/data/` (and the shader caches in `recompdata/cache/`), so the
+launcher moves, backs up and removes it with the game. There the launcher's setup screen takes
+your disc image or game folder, installs it, and shows the main settings on the game's page
+(`recomplauncher.json`, which the AppImage carries).
 
 ## Building it yourself
 
