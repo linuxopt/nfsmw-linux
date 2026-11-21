@@ -6,7 +6,7 @@ online races.**
 <a href="https://recomplauncher.com"><picture><source media="(prefers-color-scheme: dark)" srcset="https://recomplauncher.com/assets/press/launcher/badge-light.svg"><img alt="Get it on RecompLauncher" src="https://recomplauncher.com/assets/press/launcher/badge-dark.svg" height="48"></picture></a>
 
 This is an unofficial fork of [SpeedBreaker](https://github.com/SpeedBreakerProject/speedbreaker)
-v0.2.5, the static recompilation of the Xbox 360 version of *Need for Speed: Most Wanted*
+v0.2.6, the static recompilation of the Xbox 360 version of *Need for Speed: Most Wanted*
 (2005). It is not made by, or affiliated with, the SpeedBreaker project, Electronic Arts or
 Valve. The original README follows [further down](#the-original-speedbreaker-readme); everything
 in it still applies, and this section describes only what this fork adds.
@@ -63,6 +63,9 @@ Steam Deck in Desktop Mode.
 
 ## What's new in this fork
 
+- **SpeedBreaker v0.2.6** merged in: bringing in saves from an Xbox 360 or another install, a
+  smooth rear-view mirror and car reflections, lighter shadows, less CPU spent waiting, and the
+  rest of [its release notes](https://github.com/SpeedBreakerProject/speedbreaker/releases/tag/v0.2.6).
 - **A native Linux AppImage**: one file with the game, its launcher and its tools. No install;
   data goes to `~/.local/share/speedbreaker`, as with the SteamOS bundle.
 - **A desktop launcher** (Qt 6, dark theme): every in-game setting, keyboard controls, save
@@ -214,7 +217,11 @@ The runtime is `runtime-x86_64` from [AppImage/type2-runtime](https://github.com
 
 ## Known limitations
 
-- The in-game **Check for Updates** looks at the original SpeedBreaker releases, not this fork's.
+- There's no **Check for Updates** in this fork: the original's looks at the original
+  SpeedBreaker releases, not this fork's, so the menus don't have it and the game doesn't ask at
+  startup. New versions are on this repository's
+  [Releases](https://github.com/linuxopt/nfsmw-linux/releases) page (GitHub's **Watch > Custom >
+  Releases** tells you of them), or come through [RecompLauncher](https://recomplauncher.com).
 - The launcher needs the system's systemd and OpenGL libraries; without them it doesn't appear
   (the game still starts).
 - After deleting a save, getting it back means **Import** from the hidden `save-backups` folder.
