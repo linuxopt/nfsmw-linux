@@ -22,6 +22,7 @@ SB_PAL_DE_ADDRESS(0x822206C0, 0x822206C0)  // in sub_822206C0 (reloc-equal), rel
 SB_PAL_DE_ADDRESS(0x82223220, 0x82223220)  // in sub_82223220 (reloc-equal), reloc-equal; game/hfr_diag.cpp
 SB_PAL_DE_ADDRESS(0x82223308, 0x82223308)  // outside .pdata, neighbour delta +0x0, exact; game/hfr.cpp
 SB_PAL_DE_ADDRESS(0x822234F0, 0x822234F0)  // in sub_822234F0 (reloc-equal), reloc-equal; game/hfr.cpp
+SB_PAL_DE_ADDRESS(0x82223BB8, 0x82223BB8)  // added by hand: the visual treatment's curve and constants (sub_82223BB8), unshifted as the hooks around it (0x82223220-0x82225730); game/post_fx.cpp. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x822251C8, 0x822251C8)  // in sub_822251C8 (reloc-equal), reloc-equal; game/glare.cpp
 SB_PAL_DE_ADDRESS(0x822254B0, 0x822254B0)  // in sub_82225438 (reloc-equal), exact; game/glare.h
 SB_PAL_DE_ADDRESS(0x82225730, 0x82225730)  // in sub_82225730 (reloc-equal), reloc-equal; game/glare.cpp
@@ -31,6 +32,8 @@ SB_PAL_DE_ADDRESS(0x82234A68, 0x82234A68)  // in sub_82234A68 (exact), exact; ga
 SB_PAL_DE_ADDRESS(0x822824C8, 0x822824E0)  // in sub_822824C8 (exact), exact; game/quick_race_cops.cpp
 SB_PAL_DE_ADDRESS(0x82282A58, 0x82282A70)  // in sub_82282A58 (reloc-equal), exact; game/language.cpp
 SB_PAL_DE_ADDRESS(0x82282F00, 0x82282F18)  // in sub_82282E80 (reloc-equal), exact; game/language.h
+SB_PAL_DE_ADDRESS(0x82284910, 0x82284928)  // added by hand, not confirmed: cFEng::QueuePackagePush, +0x18 as 0x82282F00 (0x822BCBC8 is +0x8); game/fe_actions.cpp checks the code there before calling it. Rerun survey/region_map.py check to confirm
+SB_PAL_DE_ADDRESS(0x822869C0, 0x822869D8)  // added by hand, not confirmed: FEAnyMovieScreen::LaunchMovie, +0x18 as 0x82282F00 (0x822BCBC8 is +0x8); game/fe_actions.cpp checks the code there before calling it. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x822BCBC8, 0x822BCBD0)  // in sub_822BCBC8 (reloc-equal), exact; game/language.cpp
 SB_PAL_DE_ADDRESS(0x822C4FB8, 0x822C4FC0)  // in sub_822C4FB8 (reloc-equal), exact; game/quick_race_cops.cpp
 SB_PAL_DE_ADDRESS(0x822E23D0, 0x822E23D8)  // in sub_822E23D0 (reloc-equal), exact; game/quick_race_cops.cpp
@@ -47,6 +50,7 @@ SB_PAL_DE_ADDRESS(0x822E49A8, 0x822E49B0)  // in sub_822E49A8 (reloc-equal), exa
 SB_PAL_DE_ADDRESS(0x822E49F0, 0x822E49F8)  // outside .pdata, neighbour delta +0x8, exact; game/quick_race_cops.cpp
 SB_PAL_DE_ADDRESS(0x822E4A00, 0x822E4A08)  // outside .pdata, neighbour delta +0x8, exact; game/quick_race_cops.cpp
 SB_PAL_DE_ADDRESS(0x823AFC68, 0x823AFDC8)  // in sub_823AFC68 (reloc-equal), exact; game/hfr.cpp
+SB_PAL_DE_ADDRESS(0x823AFE20, 0x823AFF80)  // added by hand: the frame (sub_823AFE20), +0x160 as its neighbours 0x823AFC68 and 0x823B48E0; game/fe_actions.cpp. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x823B48E0, 0x823B4A40)  // in sub_823B4740 (reloc-equal), exact; game/language.h
 SB_PAL_DE_ADDRESS(0x8243B0B0, 0x8243B218)  // outside .pdata, neighbour delta +0x168, exact; game/hfr_diag.cpp
 SB_PAL_DE_ADDRESS(0x8243EAC0, 0x8243EC28)  // in sub_8243EAC0 (reloc-equal), reloc-equal; game/hfr.cpp
@@ -95,14 +99,17 @@ SB_PAL_DE_ADDRESS(0x82909730, 0x82909730)  // .data (same layout), same bytes; g
 SB_PAL_DE_ADDRESS(0x82909770, 0x82909770)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_DE_ADDRESS(0x829118D8, 0x829118D8)  // .bss (same layout), added by hand: DirtySock's xmap table pointer, beside NetConn's 0x82911768 (the same in PAL, per NFSMW Recompiled's notes); kernel/imports_net.cpp. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x82A2C480, 0x82A2C480)  // .data (same layout), same bytes; game/hfr.cpp
+SB_PAL_DE_ADDRESS(0x82A2C5C4, 0x82A2C5C4)  // .data (same layout), added by hand: the cFEng pointer, between 0x82A2C480 and 0x82A2C684 (both the same in PAL); game/fe_actions.h. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x82A2C684, 0x82A2C684)  // .data (same layout), same bytes; game/quick_race_cops.h, game/split_screen.h
 SB_PAL_DE_ADDRESS(0x82A2CB6C, 0x82A2CB6C)  // .data (same layout), same bytes; game/hfr.cpp, game/hfr_diag.cpp, hid/input.cpp
 SB_PAL_DE_ADDRESS(0x82A2CC08, 0x82A2CC08)  // .data (same layout), same bytes; game/hfr.cpp
+SB_PAL_DE_ADDRESS(0x82A2CE00, 0x82A2CE00)  // .data (same layout), added by hand: UnlockAllThings, between 0x82A2CB6C and 0x82A2CF40 (both the same in PAL); game/unlocks.h. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x82A2CF40, 0x82A2CF40)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_DE_ADDRESS(0x82A2D190, 0x82A2D190)  // .data (same layout), same bytes; game/front_end_matrix.h
 SB_PAL_DE_ADDRESS(0x82A2D5E0, 0x82A2D5E0)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_DE_ADDRESS(0x82A34940, 0x82A34940)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_DE_ADDRESS(0x82A38070, 0x82A38070)  // .data (same layout), same bytes; game/hfr.cpp
+SB_PAL_DE_ADDRESS(0x82A39AD8, 0x82A39AD8)  // .data (same layout), added by hand: the game flow state, between 0x82A38070 and 0x82C3F590 (both the same in PAL); game/fe_actions.h. Rerun survey/region_map.py check to confirm
 SB_PAL_DE_ADDRESS(0x82C3F590, 0x82C3F590)  // .data (same layout), same bytes; game/ultrawide.cpp
 SB_PAL_DE_ADDRESS(0x82C5E348, 0x82C5E348)  // .data (same layout), same bytes; game/hfr.cpp
 SB_PAL_DE_ADDRESS(0x82C84D3C, 0x82C84D3C)  // .data (same layout), same bytes; game/hfr_diag.cpp

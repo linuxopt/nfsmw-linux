@@ -16,6 +16,7 @@
 #include "kernel/dispatcher.h"
 #include "cpu/guest_time.h"
 #include <video/presenter.h>
+#include <game/unlocks.h>
 #include <gpu/renderer.h>
 #include <game/hfr.h>
 #include <hid/input.h>
@@ -617,6 +618,8 @@ int main(int argc, char** argv)
     }
     memcpy(g_memory.Translate(image.base), image.data.get(), image.size);
     fprintf(stderr, "[loader] image %08zX-%08zX, entry %08zX\n", image.base, image.base + image.size, image.entry_point);
+    // Unlock Everything (game/unlocks.h), before any guest code runs.
+    game::unlocks::Start();
     // The window's icon: the game's own, from its dashboard art (install/title_icon.h).
     video::SetWindowIcon(install::TitleIcon(file, std::span<const uint8_t>(image.data.get(), image.size), image.base));
 

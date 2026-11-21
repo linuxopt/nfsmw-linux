@@ -18,6 +18,7 @@
 
 #include <apu/audio.h>       // the 7.1 Speakers row's note: the output's channels
 #include <game/language.h>  // the Language row's note: what the installed files give
+#include <game/fe_actions.h>  // the Game page's Watch Movie and Debug Car Customize
 #include <gpu/renderer.h>    // Internal Resolution's labels: what each entry renders now
 #include <report/report.h>
 #include <update/updater.h>  // the footer's "Update to v0.2.5"
@@ -49,6 +50,9 @@ namespace ui
         bool s_focusFirstRow = true; // put the controller's cursor on the page's first row
         Id s_described = Id::Count;  // the row the help line describes
         bool s_describedBugReport = false;  // ...or Save Bug Report's
+        bool s_describedMovie = false;      // ...or Watch Movie's
+        bool s_describedDebugCar = false;   // ...or Debug Car Customize's
+        size_t s_movie = 0;                 // Watch Movie's choice (game/fe_actions.h Movies)
         bool s_describedUpdate = false;     // ...or Check for Updates'
         bool s_opened = true;        // just opened: take focus
         // The Controls page (KeyRow). A row's two keys are cells; the chosen
@@ -102,8 +106,6 @@ namespace ui
         {
             if (c == Category::Wheel)
                 return hid::wheel::Found();
-            if (c == Category::Game)  // its one row, Language, isn't shown on iPhone and iPad
-                return !settings::Info(Id::GameLanguage).hidden;
 #if defined(__APPLE__) && TARGET_OS_IOS
             if (c == Category::Controls)
                 return SDL_HasKeyboard();
@@ -616,6 +618,37 @@ namespace ui
                 hid::wheel::BackStep();
         }
 
+        // Settings > Game > Watch Movie: left and right choose one of the
+        // game's movies, A plays it through the game's own movie screen
+        // (game/fe_actions.h) and closes the menu. At the game's menus only.
+        void MovieRow(float valueWidth)
+        {
+            const auto movies = game::fe_actions::Movies();
+            const bool can = game::fe_actions::FrontEndUp() && game::fe_actions::Available();
+            const char* value = can ? movies[s_movie].label : "At the main menu";
+            const bool activated = ActionRow("watch-movie", "Watch Movie", value, valueWidth, s_describedMovie);
+            if (s_describedMovie)
+            {
+                if (ImGui::IsKeyPressed(ImGuiKey_GamepadDpadRight) || ImGui::IsKeyPressed(ImGuiKey_RightArrow))
+                    s_movie = (s_movie + 1) % movies.size();
+                else if (ImGui::IsKeyPressed(ImGuiKey_GamepadDpadLeft) || ImGui::IsKeyPressed(ImGuiKey_LeftArrow))
+                    s_movie = (s_movie + movies.size() - 1) % movies.size();
+            }
+            if (activated && can && game::fe_actions::PlayMovie(movies[s_movie].name))
+                CloseSettings();
+        }
+
+        // Settings > Game > Debug Car Customize: the developers' car viewer
+        // (every car model on the disc, part by part), a screen the retail
+        // game never opens.
+        void DebugCarRow(float valueWidth)
+        {
+            const bool can = game::fe_actions::FrontEndUp() && game::fe_actions::Available();
+            if (ActionRow("debug-car", "Debug Car Customize", can ? "Open" : "At the main menu", valueWidth, s_describedDebugCar) &&
+                can && game::fe_actions::OpenScreen("UI_DebugCarCustomize.fng"))
+                CloseSettings();
+        }
+
         // A (or a click) saves the report.
         void BugReportRow(float valueWidth)
         {
@@ -713,6 +746,20 @@ namespace ui
             if (s_describedUpdate)
             {
                 UpdateRowHelp();
+                return;
+            }
+            if (s_describedMovie)
+            {
+                ImGui::TextWrapped("Any of the game's movies, whatever your career has reached: the 15 Blacklist rivals' "
+                                   "introductions, the story scenes, the tutorials and the attract movie. Left and right choose, "
+                                   "A plays it (the menu closes). At the game's menus, not in a race; the game's A or B skips it.");
+                return;
+            }
+            if (s_describedDebugCar)
+            {
+                ImGui::TextWrapped("The developers' car viewer, left in the game but never opened by it: every car model on the "
+                                   "disc (the BMW M3 GTR race car and the 1967 Camaro among them) and each of its parts. Up and "
+                                   "down choose a row, left and right change it, B goes back. It doesn't change your cars or saves.");
                 return;
             }
             if (s_describedBugReport)
@@ -970,6 +1017,8 @@ namespace ui
             ImGui::SetKeyOwner(ImGuiKey_GamepadFaceLeft, ImHashStr("controls-x"));
         s_described = Id::Count;
         s_describedBugReport = false;
+        s_describedMovie = false;
+        s_describedDebugCar = false;
         s_describedUpdate = false;
         s_describedCal = false;
         if (s_waiting != Id::Count && settings::Info(s_waiting).category != s_category)
@@ -1039,6 +1088,12 @@ namespace ui
                     if (category == Category::Advanced)
                         for (const char* text : { "Saving...", "Checking...", "Couldn't check (offline)", UpdateRowValue() })
                             valueWidth = std::max(valueWidth, ImGui::CalcTextSize(text).x);
+                    if (category == Category::Game)
+                    {
+                        valueWidth = std::max(valueWidth, ImGui::CalcTextSize("At the main menu").x);
+                        for (const auto& m : game::fe_actions::Movies())
+                            valueWidth = std::max(valueWidth, ImGui::CalcTextSize(m.label).x);
+                    }
                     if (category == Category::Wheel)
                         for (const char* text : { "Start", "17/17" })
                             valueWidth = std::max(valueWidth, ImGui::CalcTextSize(text).x);
@@ -1064,6 +1119,11 @@ namespace ui
                                 }
                         if (category == Category::Wheel)
                             CalibrateRow(valueWidth);
+                        if (category == Category::Game)
+                        {
+                            MovieRow(valueWidth);
+                            DebugCarRow(valueWidth);
+                        }
                         if (category == Category::Advanced)
                         {
                             BugReportRow(valueWidth);

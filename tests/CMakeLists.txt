@@ -35,6 +35,8 @@ sb_test(block_ranges_test)
 # game's when there is one in game/files.
 sb_test(title_icon_test SOURCES ${RT}/install/title_icon.cpp ARGS ${CMAKE_SOURCE_DIR}/game/files/default.xex)
 target_link_libraries(title_icon_test PRIVATE XenonUtilsLite)
+# Haze: the game's tone curve's black point, scaled (game/post_fx.h, header only).
+sb_test(post_fx_test)
 # Where guest memory and the upload ring go (gpu/memory_plan.h, header only).
 sb_test(memory_plan_test)
 # A discrete GPU's PCIe link for the logs (gpu/pcie_link.h, header only; issue #40).

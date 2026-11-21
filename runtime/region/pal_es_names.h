@@ -14,6 +14,8 @@
 #define SB_PAL_ES_sub_82223220 sub_82223220
 #define SB_PAL_ES_sub_82223308 sub_82223308
 #define SB_PAL_ES_sub_822234F0 sub_822234F0
+// Added by hand (unshifted, as the hooks around it, 0x82223220-0x82225730): game/post_fx.cpp. Rerun survey/region_map.py table to confirm.
+#define SB_PAL_ES_sub_82223BB8 sub_82223BB8
 #define SB_PAL_ES_sub_822251C8 sub_822251C8
 #define SB_PAL_ES_sub_82225730 sub_82225730
 #define SB_PAL_ES_sub_8222ADC0 sub_8222ADC0
@@ -21,6 +23,8 @@
 #define SB_PAL_ES_sub_822BCBC8 sub_822BCBD0
 #define SB_PAL_ES_sub_822C4FB8 sub_822C4FC0
 #define SB_PAL_ES_sub_823AFC68 sub_823AFDC8
+// Added by hand (+0x160, as its neighbours 0x823AFC68 and 0x823B48E0): game/fe_actions.cpp. Rerun survey/region_map.py table to confirm.
+#define SB_PAL_ES_sub_823AFE20 sub_823AFF80
 #define SB_PAL_ES_sub_8243B0B0 sub_8243B218
 #define SB_PAL_ES_sub_8243EAC0 sub_8243EC28
 #define SB_PAL_ES_sub_82441050 sub_824411B8

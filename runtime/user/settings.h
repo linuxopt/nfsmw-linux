@@ -64,6 +64,7 @@ namespace settings
         SharpUi,         // Sharper UI: the front end's magnified art reconstructed (gpu/sharp_ui.h)
         MovieUpscaling,  // how movies are enlarged while they play at 1x (video/upscale.h MoviePass)
         HdTextures,      // the HD texture pack: Off, Auto, 1K, 2K (gpu/texpack_auto.h); shown only with a pack installed
+        Haze,            // how far the game's tone curve lifts black, in percent (game/post_fx.h)
         WindowWidth,   // hidden: the window's size, remembered between runs
         WindowHeight,  // hidden
         // Hidden: 1 once MigrateShadowResolution turned a pre-v0.2.4 file's
@@ -150,6 +151,8 @@ namespace settings
         UpdateCheck,  // Check for Updates at Startup (update/updater.h); the menu shows it after Check for Updates
         // Game (the [game] table)
         GameLanguage,  // game/language.cpp: the game's language, game::language's ids (English = 0)
+        UnlockEverything,  // game/unlocks.h: the game's own unlock-all switch
+        GameSpeed,  // game/frame_time.cpp: the world's speed in races, in percent
         // The desktop launcher (launcher/, the [launcher] table; hidden: the
         // game doesn't use it, but its saves keep it)
         LauncherShowAtStart,  // open the launcher before the game (Linux AppImage)

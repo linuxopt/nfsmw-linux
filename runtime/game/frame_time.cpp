@@ -46,7 +46,9 @@
 #include "frame_time.h"
 #include "whole_vblanks.h"
 
+#include <game/fe_actions.h>
 #include <kernel/function.h>
+#include <user/settings.h>
 #include <video/presenter.h>
 #include <video/vblank_lock.h>
 
@@ -113,7 +115,15 @@ void GameFrameTime(PPCRegister& r3)
     struct AddToClock
     {
         PPCRegister& r3;
-        ~AddToClock() { s_clock.fetch_add(uint64_t(std::max(int32_t(r3.u32), 0)), std::memory_order_relaxed); }
+        ~AddToClock()
+        {
+            // Game Speed: the world's time, scaled after the whole-vblank
+            // rounding above has made its count (and not at the menus).
+            const int32_t percent = settings::GetInt(settings::Id::GameSpeed);
+            if (percent != 100 && percent > 0 && !game::fe_actions::FrontEndUp())
+                r3.u64 = uint32_t(std::max<int64_t>(int64_t(int32_t(r3.u32)) * percent / 100, 0));
+            s_clock.fetch_add(uint64_t(std::max(int32_t(r3.u32), 0)), std::memory_order_relaxed);
+        }
     } addToClock{ r3 };
     static uint64_t last = 0;
     uint64_t now = video::GuestVblanks(), vblanks = now - last;
