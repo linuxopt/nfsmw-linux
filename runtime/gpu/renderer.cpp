@@ -5497,6 +5497,8 @@ void main()
                     region.bufferOffset = staging;
                     region.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, level, 0, 1 };
                     region.imageExtent = { std::max(1u, img.width >> level), std::max(1u, img.height >> level), 1 };
+                    StepBegin(gpu::markers::Kind::Upload, "HD texture %016llX %ux%u, level %u: copied into its image",
+                        (unsigned long long)key, img.width, img.height, level);
                     vkCmdCopyBufferToImage(s_cmd, s_ring, image.image, VK_IMAGE_LAYOUT_GENERAL, 1, &region);
                 }
                 FullBarrier();
