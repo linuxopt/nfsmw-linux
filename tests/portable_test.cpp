@@ -39,6 +39,7 @@ namespace fs = std::filesystem;
 using namespace install;
 using portable::Layout;
 using portable::Resolve;
+using portable::LauncherRoot;
 
 static bool Has(const std::string& text, const char* part)
 {
@@ -82,6 +83,24 @@ static bool There(const fs::path& path)
 }
 
 // --- Pure ---------------------------------------------------------------------
+
+// RecompLauncher's data folder (RECOMPLAUNCHER_DATA): the layout's root
+// when it's absolute, whatever portable.txt says; nothing otherwise.
+static void LauncherData()
+{
+    CHECK(LauncherRoot("/games/SpeedBreaker/recompdata") == fs::path("/games/SpeedBreaker/recompdata"), "absolute: %s",
+        LauncherRoot("/games/SpeedBreaker/recompdata").c_str());
+    CHECK(LauncherRoot("/games/SpeedBreaker/recompdata/") == fs::path("/games/SpeedBreaker/recompdata"), "a trailing separator");
+    CHECK(LauncherRoot(nullptr).empty() && LauncherRoot("").empty(), "not set: none");
+    CHECK(LauncherRoot("recompdata").empty(), "relative: none");
+    Layout layout = Resolve(LauncherRoot("/games/SpeedBreaker/recompdata"), true, true);
+    CHECK(layout.data == fs::path("/games/SpeedBreaker/recompdata/data") &&
+              layout.cache == fs::path("/games/SpeedBreaker/recompdata/cache"),
+        "data and caches in it: %s %s", layout.data.c_str(), layout.cache.c_str());
+    layout.launcher = true;
+    CHECK(Has(portable::Describe(layout), "RecompLauncher") && !Has(portable::Describe(layout), "portable.txt"),
+        "said as the launcher's: %s", portable::Describe(layout).c_str());
+}
 
 static void PureLayout()
 {
@@ -680,6 +699,7 @@ static void SwitchOff(const fs::path& scratch)
 int main(int argc, char** argv)
 {
     PureLayout();
+    LauncherData();
     PureRecords();
     Paths();
     PlacementRules();

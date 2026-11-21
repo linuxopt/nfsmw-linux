@@ -63,6 +63,7 @@ namespace portable
         std::filesystem::path root;     // SpeedBreaker's folder: absolute, normalized, no trailing separator
         std::filesystem::path data;     // root/data
         std::filesystem::path cache;    // root/cache
+        bool launcher = false;          // the root is RecompLauncher's data folder (LauncherRoot), not portable.txt's
 
         bool Active() const { return !root.empty(); }
     };
@@ -88,8 +89,17 @@ namespace portable
     // Is there a portable.txt in `root`: a file, or a link to one (one stat)?
     bool MarkerIn(const std::filesystem::path& root);
 
-    // Startup: Resolve(root, MarkerIn(root)) made current, and returned. No
-    // look at the disk on Apple platforms.
+    // RecompLauncher (recomplauncher.com) keeps everything a game makes in
+    // one folder of its own and passes it as RECOMPLAUNCHER_DATA. Given an
+    // absolute one, it is the layout's root (data in <it>/data, caches in
+    // <it>/cache), as portable.txt would make SpeedBreaker's folder: the
+    // launcher then moves, backs up and removes it with the game. Pure: the
+    // variable's value (nullptr when unset) to that root, or empty.
+    std::filesystem::path LauncherRoot(const char* recomplauncherData);
+
+    // Startup: Resolve(root, MarkerIn(root)) made current, and returned; or,
+    // with RECOMPLAUNCHER_DATA set (LauncherRoot), the launcher's folder
+    // instead. No look at the disk on Apple platforms.
     const Layout& Detect(const std::filesystem::path& root);
 
     // The text recorded for the game folder `folder` (absolute, links

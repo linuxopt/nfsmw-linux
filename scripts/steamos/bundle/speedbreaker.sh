@@ -40,8 +40,17 @@ PORTABLE=0
 # The log: here, or in the data folder if this one isn't writable (or /tmp,
 # the last place a log can go; in portable mode, straight there). On a
 # terminal it's shown as well (`speedbreaker.sh --install ...`).
+# Started by RecompLauncher (recomplauncher.com), which passes the folder it
+# keeps the game's data in (RECOMPLAUNCHER_DATA; the game keeps its data/
+# and cache/ there, user/portable.h): the log goes in its data/, and the
+# output is passed on as well, so the launcher's setup screen gets the
+# installer's progress lines.
+LAUNCHER_DATA=""
+case "${RECOMPLAUNCHER_DATA:-}" in /*) LAUNCHER_DATA="$RECOMPLAUNCHER_DATA/data" ;; esac
 LOG_DIR="$HERE"
-if [ ! -w "$LOG_DIR" ]; then
+if [ -n "$LAUNCHER_DATA" ] && mkdir -p "$LAUNCHER_DATA" 2>/dev/null && [ -w "$LAUNCHER_DATA" ]; then
+    LOG_DIR="$LAUNCHER_DATA"
+elif [ ! -w "$LOG_DIR" ]; then
     if [ "$PORTABLE" = 1 ]; then
         LOG_DIR="${TMPDIR:-/tmp}"
     else
@@ -51,7 +60,7 @@ if [ ! -w "$LOG_DIR" ]; then
     fi
 fi
 [ -f "$LOG_DIR/last-run.log" ] && mv -f "$LOG_DIR/last-run.log" "$LOG_DIR/previous-run.log"
-if [ -t 2 ]; then
+if [ -t 2 ] || [ -n "$LAUNCHER_DATA" ]; then
     exec > >(tee "$LOG_DIR/last-run.log") 2>&1
 else
     exec > "$LOG_DIR/last-run.log" 2>&1

@@ -2,6 +2,7 @@
 #include "portable.h"
 
 #include <cerrno>
+#include <cstdlib>
 #include <cstdio>
 #include <format>
 #include <system_error>
@@ -53,9 +54,23 @@ namespace portable
         return !root.empty() && fs::is_regular_file(root / kMarker, ec);
     }
 
+    std::filesystem::path LauncherRoot(const char* recomplauncherData)
+    {
+        if (!recomplauncherData || !*recomplauncherData)
+            return {};
+        fs::path root(recomplauncherData);
+        return root.is_absolute() ? Normal(root) : fs::path();
+    }
+
     const Layout& Detect(const std::filesystem::path& root)
     {
-        CurrentLayout() = Resolve(root, kSupported && MarkerIn(root));
+        if (fs::path launcher = LauncherRoot(std::getenv("RECOMPLAUNCHER_DATA")); !launcher.empty())
+        {
+            CurrentLayout() = Resolve(launcher, true);
+            CurrentLayout().launcher = CurrentLayout().Active();
+        }
+        else
+            CurrentLayout() = Resolve(root, kSupported && MarkerIn(root));
         return Current();
     }
 
@@ -118,6 +133,9 @@ namespace portable
     {
         if (!layout.Active())
             return {};
+        if (layout.launcher)
+            return std::format("[paths] RecompLauncher's data folder (RECOMPLAUNCHER_DATA {}): data in {}, caches in {}\n",
+                layout.root.string(), layout.data.string(), layout.cache.string());
         return std::format("[paths] portable mode ({} in {}): data in {}, caches in {}\n", kMarker, layout.root.string(),
             layout.data.string(), layout.cache.string());
     }

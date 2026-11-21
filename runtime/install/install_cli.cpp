@@ -11,6 +11,7 @@
 #include <TargetConditionals.h>
 #endif
 
+#include <cstdlib>
 #include <chrono>
 #include <csignal>
 #include <cstdio>
@@ -85,7 +86,10 @@ namespace install
         };
 
         // One rewritten status line on a terminal; a line per file otherwise
-        // (a log file or the Steam launcher's output).
+        // (a log file or the Steam launcher's output). Run by RecompLauncher
+        // (RECOMPLAUNCHER=1, its windowless setup step), also its progress
+        // lines: "progress <0 to 1> <text>", at each new file and each whole
+        // percent, which its setup screen shows.
         class ProgressPrinter
         {
         public:
@@ -95,6 +99,8 @@ namespace install
                 bool newFile = p.currentFile != lastFile;
                 if (newFile)
                     lastFile = std::string(p.currentFile);
+                if (launcher)
+                    LauncherLine(p, newFile);
                 if (p.phase == Progress::Phase::Checking || p.phase == Progress::Phase::Finalizing)
                     return;
                 int percent = p.bytesTotal ? int(p.bytesDone * 100 / p.bytesTotal) : 0;
@@ -128,6 +134,27 @@ namespace install
             }
 
         private:
+            void LauncherLine(const Progress& p, bool newFile)
+            {
+                const char* what = p.phase == Progress::Phase::Checking     ? "Checking your disc"
+                                   : p.phase == Progress::Phase::Copying    ? "Copying"
+                                   : p.phase == Progress::Phase::Verifying  ? "Checking"
+                                                                            : "Finishing";
+                const int permille = p.phase == Progress::Phase::Finalizing ? 1000
+                                     : p.bytesTotal                         ? int(p.bytesDone * 1000 / p.bytesTotal)
+                                                                            : 0;
+                if (p.phase == lastPhase && !newFile && permille / 10 == lastPermille / 10)
+                    return;
+                lastPhase = p.phase;
+                lastPermille = permille;
+                const bool file = (p.phase == Progress::Phase::Copying || p.phase == Progress::Phase::Verifying) && !lastFile.empty();
+                printf("progress %.3f %s%s%s\n", permille / 1000.0, what, file ? " " : "", file ? lastFile.c_str() : "");
+                fflush(stdout);
+            }
+
+            bool launcher = [] { const char* v = std::getenv("RECOMPLAUNCHER"); return v && v[0] == '1'; }();
+            Progress::Phase lastPhase = Progress::Phase::Finalizing;
+            int lastPermille = -1;
             bool tty = isatty(STDOUT_FILENO);
             bool printed = false;
             std::string lastFile;
