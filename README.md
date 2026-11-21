@@ -734,13 +734,28 @@ then Yes, puts it back.
 | Shadow Edges | Auto / Smooth / Classic | Auto: Smooth everywhere except the Steam Deck. Smooth softens the stair steps along the edges of car, building and pole shadows; Classic keeps the edges as the Xbox 360 drew them. On the Steam Deck, Auto is Classic because the busiest city scenes would otherwise drop an occasional frame; you can still choose Smooth there. The change takes effect at once, without a restart. |
 | Sharper UI | On / Off | On. Above 1x Internal Resolution, the menus' and the HUD's text, icons and panels are enlarged with a sharper filter instead of a blur, so they look crisper on 1440p and 4K screens. Where the finished picture is then enlarged to the screen by an uneven factor (for example 1440p to 4K), the UI's pixels also take FSR 1's edge-aware upscale and skip the anti-aliasing pass. The art, layout and colors are the game's own; at 1x on a 16:9 screen it changes nothing. |
 | Movie Upscaling | Original / Sharper | Sharper: the game's 720p movies (the intro and the cutscenes) are enlarged with a sharper, edge-aware filter: FSR 1's upscale where the movie reaches the screen at 1x, the same filter as Sharper UI above 1x, and a Lanczos filter on iPhone and iPad at 1x. Original keeps the movies as before. |
+| Haze | 0-100% | 100%. Most Wanted's colour treatment lifts the picture's dark end: its tone curve turns black into about 15% grey, the grey veil over its scenes. Lower keeps shadows and dark areas deeper and the picture clearer; 0% leaves black black, which is darker overall (40-60% is a middle way). Bright parts change little. Applies at once. |
 
 **Game:** Language (English): French, German, Italian, Spanish, Dutch, Swedish, Danish, Polish or
 Finnish switch the menus and the race text (European languages show km/h) the next time the game
 starts. The text comes from the disc's own files; the movies and the speech stay in the disc's
 language (English on the USA disc, Spanish on the PAL one). The PAL disc starts in Spanish.
 The line under the row says what your installed files give the language you choose. Not shown on
-iPhone and iPad.
+iPhone and iPad. Unlock Everything (Off): every car, part, track and event the game can unlock,
+from the start, through the game's own developer switch. Quick Race's Bonus cars (the Blacklist
+rivals' cars, the M3 GTR, SL65, Corvette C6.R and 911 GT2) all open, plus the Ford GT the Castrol
+cheat code gives. It applies to the career too (the car lot, the shops, the events). It isn't saved
+in your profile: Off puts everything back as your progress has it. `NFSMW_UNLOCK_ALL=1` turns it on
+for one run.
+Game Speed (100%, 25-200%): how fast the world runs in races and free roam, cars, cops and timers
+alike (the PC release's Tweak_GameSpeed). Below 100% the world still moves in its 1/60 s steps,
+fewer per frame, so slow motion looks less smooth. The menus and movies keep their speed. The page
+also has two buttons, used at the game's menus: **Watch Movie** (left and right choose, A plays)
+plays any of the game's 33 movies through its own movie screen, every Blacklist rival's intro and
+story scene included, whatever your career has reached. **Debug Car Customize** opens the
+developers' car viewer, left in the game but never opened by it: every car model on the disc (the
+BMW M3 GTR race car and the 1967 Camaro among them) and each of its parts. Neither changes your
+saves.
 
 **Audio:** Master Volume (100%), Mute (Off), Mute in Background (Off), which silences the
 game while its window isn't in front, and 7.1 Speakers (Off). The game's sound is 5.1, so on a
