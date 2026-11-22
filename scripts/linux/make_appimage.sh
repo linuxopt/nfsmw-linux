@@ -6,7 +6,9 @@
 #
 # <runtime> is an AppImage type-2 runtime stub (runtime-x86_64 from
 # github.com/AppImage/type2-runtime, or the first <offset> bytes of any type-2
-# AppImage, see --appimage-offset). Needs mksquashfs (squashfs-tools).
+# AppImage, see --appimage-offset). Needs mksquashfs (squashfs-tools) and
+# python3. Writes the AppImage, a zip of it for RecompLauncher, a .sha256 for
+# each, and recomplauncher.json.
 #
 # The AppImage holds exactly the bundle (launcher, lib/, licenses) plus
 # AppRun, a .desktop file, the icon and recomplauncher.json. Never any game data: the first run's
@@ -17,6 +19,7 @@ RUNTIME="${1:?usage: make_appimage.sh <type2 runtime> [bundle dir] [output dir]}
 BUNDLE="$(readlink -f "${2:-$ROOT/build/bundle/SpeedBreaker}")"
 OUT="$(readlink -f "${3:-$ROOT/build/appimage}")"
 command -v mksquashfs >/dev/null || { echo "make_appimage.sh: no mksquashfs (install squashfs-tools)" >&2; exit 1; }
+command -v python3 >/dev/null || { echo "make_appimage.sh: no python3 (it writes the RecompLauncher zip)" >&2; exit 1; }
 [ -x "$BUNDLE/speedbreaker.sh" ] && [ -x "$BUNDLE/lib/SpeedBreaker" ] || { echo "make_appimage.sh: $BUNDLE isn't a bundle (run make_bundle.sh first)" >&2; exit 1; }
 [ "$(head -c 4 "$RUNTIME" | od -An -c | tr -d ' ')" = '177ELF' ] || { echo "make_appimage.sh: $RUNTIME isn't an ELF runtime" >&2; exit 1; }
 
@@ -163,8 +166,28 @@ rm -f "$SQ"
 chmod 755 "$IMG.partial"
 mv "$IMG.partial" "$IMG"
 (cd "$OUT" && sha256sum "$(basename "$IMG")" > "$(basename "$IMG").sha256")
-# The same recomplauncher.json beside it, to attach to the release too:
-# RecompLauncher's catalog and checks look for it among a release's files
+# The same recomplauncher.json beside it, to attach to the release too
 # (the launcher itself reads the copy inside the AppImage).
 cp "$ROOT/recomplauncher.json" "$OUT/recomplauncher.json"
-echo "$(du -h "$IMG" | cut -f1) $IMG (attach it, its .sha256 and recomplauncher.json to the release)"
+# And a zip of the AppImage with recomplauncher.json beside it: RecompLauncher's
+# website check (its submit form) reads the file only from a .zip in the
+# release, not from an AppImage, a .tar.gz or a separate download. The
+# AppImage keeps its execute bit in the zip.
+ZIP="$OUT/SpeedBreaker-$VERSION-linux-x86_64.zip"
+rm -f "$ZIP" "$ZIP.partial"
+python3 -I - "$ZIP.partial" "$IMG" "$OUT/recomplauncher.json" <<'PY'
+import os, sys, zipfile
+out, *files = sys.argv[1:]
+with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+    for path in files:
+        info = zipfile.ZipInfo.from_file(path, os.path.basename(path))
+        info.compress_type = zipfile.ZIP_DEFLATED
+        info.create_system = 3  # Unix: the mode below is read
+        info.external_attr = (os.stat(path).st_mode & 0xFFFF) << 16
+        with open(path, "rb") as f:
+            z.writestr(info, f.read())
+PY
+mv "$ZIP.partial" "$ZIP"
+(cd "$OUT" && sha256sum "$(basename "$ZIP")" > "$(basename "$ZIP").sha256")
+echo "$(du -h "$IMG" | cut -f1) $IMG"
+echo "Attach to the release: $(basename "$IMG"), $(basename "$ZIP") (for RecompLauncher), each one's .sha256, and recomplauncher.json"
